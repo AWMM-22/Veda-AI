@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import multer from 'multer';
+import multer, { StorageEngine } from 'multer';
 import path from 'path';
 import { MCQAssignmentModel } from '../models/MCQAssignment';
 import { StudentResponseModel } from '../models/StudentResponse';
@@ -9,11 +9,11 @@ import { DocumentAgent } from '../services/documentAgent';
 import { MCQ, MCQAssignment } from '../types';
 
 // Multer setup for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+const storage: StorageEngine = multer.diskStorage({
+  destination: (req: Request, file: Express.Multer.File, cb: (error: Error | null, destination?: string) => void) => {
     cb(null, 'uploads/');
   },
-  filename: (req, file, cb) => {
+  filename: (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename?: string) => void) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
     cb(null, uniqueSuffix + path.extname(file.originalname));
   }

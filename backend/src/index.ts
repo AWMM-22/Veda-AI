@@ -34,7 +34,7 @@ app.use('/api/assignments', assignmentRoutes);
 app.use('/api', mcqRoutes);
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', (req: express.Request, res: express.Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 

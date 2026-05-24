@@ -3,7 +3,7 @@ import { AssignmentModel } from '../models/Assignment';
 import { PDFService } from '../services/pdfService';
 import { CreateAssignmentDTO } from '../types';
 import { z } from 'zod';
-import multer from 'multer';
+import multer, { StorageEngine } from 'multer';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { enqueueQuestionJob } from '../services/questionQueue';
@@ -11,11 +11,11 @@ import { enqueueQuestionJob } from '../services/questionQueue';
 const router = Router();
 
 // Multer config
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+const storage: StorageEngine = multer.diskStorage({
+  destination: (req: Request, file: Express.Multer.File, cb: (error: Error | null, destination?: string) => void) => {
     cb(null, 'uploads/');
   },
-  filename: (req, file, cb) => {
+  filename: (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename?: string) => void) => {
     const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
     cb(null, uniqueName);
   }
