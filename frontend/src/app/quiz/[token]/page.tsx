@@ -1,0 +1,371 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { BarChart3, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+
+interface MCQOption {
+  label: string;
+  text: string;
+}
+
+interface Question {
+  id: number;
+  questionText: string;
+  options: MCQOption[];
+  marks: number;
+}
+
+interface Quiz {
+  _id: string;
+  title: string;
+  description: string;
+  totalQuestions: number;
+  totalMarks: number;
+  timeLimit?: number;
+  questions: Question[];
+}
+
+export default function QuizPage() {
+  const params = useParams();
+  const router = useRouter();
+  const token = params.token as string;
+
+  const [loading, setLoading] = useState(true);
+  const [quiz, setQuiz] = useState<Quiz | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [result, setResult] = useState<any>(null);
+
+  // Form states
+  const [rollNumber, setRollNumber] = useState('');
+  const [studentName, setStudentName] = useState('');
+  const [responses, setResponses] = useState<Map<number, string>>(new Map());
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [started, setStarted] = useState(false);
+
+  // Fetch quiz data
+  useEffect(() => {
+    const fetchQuiz = async () => {
+      try {
+        const res = await fetch(`/api/quiz/${token}`);
+        const data = await res.json();
+
+        if (!data.success) {
+          setError(data.error || 'Failed to load quiz');
+          return;
+        }
+
+        setQuiz(data.quiz);
+        if (data.quiz.timeLimit) {
+          setTimeLeft(data.quiz.timeLimit * 60); // Convert to seconds
+        }
+      } catch (err: any) {
+        setError(err.message || 'Failed to load quiz');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (token) {
+      fetchQuiz();
+    }
+  }, [token]);
+
+  // Timer effect
+  useEffect(() => {
+    if (!started || !timeLeft) return;
+
+    const interval = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev && prev > 0) {
+          return prev - 1;
+        } else {
+          handleSubmit();
+          return 0;
+        }
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [started, timeLeft]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleAnswerChange = (questionId: number, answer: string) => {
+    const newResponses = new Map(responses);
+    newResponses.set(questionId, answer);
+    setResponses(newResponses);
+  };
+
+  const handleSubmit = async () => {
+    if (!rollNumber.trim()) {
+      alert('Please enter your roll number');
+      return;
+    }
+
+    if (responses.size === 0) {
+      alert('Please answer at least one question');
+      return;
+    }
+
+    try {
+      const formattedResponses = Array.from(responses.entries()).map(([questionIndex, selectedAnswer]) => ({
+        questionIndex,
+        selectedAnswer,
+      }));
+
+      const res = await fetch(`/api/quiz/${token}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rollNumber,
+          studentName: studentName || `Student-${rollNumber}`,
+          responses: formattedResponses,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!data.success) {
+        setError(data.error || 'Failed to submit quiz');
+        return;
+      }
+
+      setResult(data.result);
+      setSubmitted(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to submit quiz');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading quiz...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h1 className="text-xl font-bold text-slate-900 mb-2">Error</h1>
+          <p className="text-slate-600 mb-6">{error}</p>
+          <button
+            onClick={() => router.push('/')}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition"
+          >
+            Go Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!quiz) {
+    return null;
+  }
+
+  // Show result after submission
+  if (submitted && result) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+          <CheckCircle2 className="w-20 h-20 text-green-500 mx-auto mb-6" />
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">Quiz Submitted!</h1>
+          <p className="text-slate-600 mb-6">Your responses have been recorded.</p>
+
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 mb-6 space-y-3">
+            <div>
+              <p className="text-sm font-medium text-slate-600">Score</p>
+              <p className="text-4xl font-bold text-blue-600">{result.score}</p>
+              <p className="text-sm text-slate-500">out of {result.totalMarks}</p>
+            </div>
+            <div className="h-px bg-slate-200"></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium text-slate-600">Percentage</p>
+                <p className="text-2xl font-bold text-indigo-600">{result.percentage.toFixed(1)}%</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-600">Roll Number</p>
+                <p className="text-lg font-bold text-slate-900">{result.rollNumber}</p>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-xs text-slate-500 mb-4">
+            Check the ranking dashboard to see how you compare with other students
+          </p>
+
+          <button
+            onClick={() => router.push('/')}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition"
+          >
+            Return Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Pre-quiz form
+  if (!started) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">{quiz.title}</h1>
+            {quiz.description && (
+              <p className="text-slate-600">{quiz.description}</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 p-4 bg-blue-50 rounded-xl">
+            <div className="text-center">
+              <BarChart3 className="w-6 h-6 text-blue-600 mx-auto mb-2" />
+              <p className="text-sm text-slate-600">Questions</p>
+              <p className="text-2xl font-bold text-slate-900">{quiz.totalQuestions}</p>
+            </div>
+            <div className="text-center">
+              <CheckCircle2 className="w-6 h-6 text-green-600 mx-auto mb-2" />
+              <p className="text-sm text-slate-600">Total Marks</p>
+              <p className="text-2xl font-bold text-slate-900">{quiz.totalMarks}</p>
+            </div>
+            {quiz.timeLimit && (
+              <div className="text-center">
+                <Clock className="w-6 h-6 text-orange-600 mx-auto mb-2" />
+                <p className="text-sm text-slate-600">Time Limit</p>
+                <p className="text-2xl font-bold text-slate-900">{quiz.timeLimit} mins</p>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4 mb-8">
+            <div>
+              <label className="block text-sm font-semibold text-slate-900 mb-2">
+                Roll Number *
+              </label>
+              <input
+                type="text"
+                value={rollNumber}
+                onChange={(e) => setRollNumber(e.target.value)}
+                placeholder="Enter your roll number"
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-900 mb-2">
+                Name (Optional)
+              </label>
+              <input
+                type="text"
+                value={studentName}
+                onChange={(e) => setStudentName(e.target.value)}
+                placeholder="Enter your name"
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={() => setStarted(true)}
+            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-lg font-bold transition text-lg"
+          >
+            Start Quiz
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Quiz interface
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="bg-white rounded-xl shadow-md p-4 mb-6 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">{quiz.title}</h1>
+            <p className="text-sm text-slate-600">Roll: {rollNumber}</p>
+          </div>
+          {timeLeft !== null && (
+            <div className={`text-center px-4 py-2 rounded-lg font-bold ${
+              timeLeft < 300 ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+            }`}>
+              <Clock className="w-4 h-4 inline-block mr-2" />
+              {formatTime(timeLeft)}
+            </div>
+          )}
+        </div>
+
+        {/* Questions */}
+        <div className="space-y-4">
+          {quiz.questions.map((question, idx) => (
+            <div key={question.id} className="bg-white rounded-xl shadow-md p-6">
+              <div className="mb-4">
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-bold text-slate-900">
+                    Q{idx + 1}. {question.questionText}
+                  </h3>
+                  <span className="text-xs font-semibold bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                    {question.marks} mark{question.marks !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {question.options.map((option) => (
+                  <label
+                    key={option.label}
+                    className={`flex items-center p-3 rounded-lg border-2 cursor-pointer transition ${
+                      responses.get(idx) === option.label
+                        ? 'border-blue-600 bg-blue-50'
+                        : 'border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name={`question-${idx}`}
+                      value={option.label}
+                      checked={responses.get(idx) === option.label}
+                      onChange={() => handleAnswerChange(idx, option.label)}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <span className="ml-3 font-medium text-slate-900">
+                      {option.label}. {option.text}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Submit Button */}
+        <div className="mt-8 text-center">
+          <button
+            onClick={handleSubmit}
+            className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-8 py-3 rounded-lg font-bold transition text-lg"
+          >
+            Submit Quiz
+          </button>
+          <p className="text-xs text-slate-500 mt-2">
+            Questions answered: {responses.size} / {quiz.totalQuestions}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}

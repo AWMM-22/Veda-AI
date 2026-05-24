@@ -17,7 +17,9 @@ import {
   ChevronRight,
   ChevronLeft,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Zap,
+  BookOpen
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -38,6 +40,7 @@ export default function CreateAssignmentPage() {
   const { sidebarOpen } = useStore();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreatingQuiz, setIsCreatingQuiz] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
 
@@ -153,6 +156,40 @@ export default function CreateAssignmentPage() {
       toast.error(error.response?.data?.message || 'Failed to create assignment');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleCreateQuizOnly = async () => {
+    if (!file) {
+      toast.error('Please upload a PDF file first');
+      return;
+    }
+
+    setIsCreatingQuiz(true);
+    try {
+      // Create FormData with file and other data
+      const formPayload = new FormData();
+      formPayload.append('file', file);
+      formPayload.append('title', formData.title);
+      formPayload.append('className', formData.className);
+      formPayload.append('subject', formData.subject);
+      formPayload.append('schoolName', formData.schoolName);
+
+      // Create MCQ directly from PDF
+      const mcqRes = await api.post('/mcq/create-from-pdf', formPayload, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (mcqRes.data.success) {
+        toast.success('Quiz created successfully! Redirecting to MCQ dashboard...');
+        // Redirect to MCQ management page to see questions and QR code
+        const assignmentId = mcqRes.data.mcqAssignment.assignmentId;
+        router.push(`/assignments/${assignmentId}/mcq`);
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to create quiz');
+    } finally {
+      setIsCreatingQuiz(false);
     }
   };
 
@@ -431,31 +468,48 @@ export default function CreateAssignmentPage() {
               </div>
 
               {/* Actions */}
-              <div className="flex items-center justify-between pt-4">
-                <button 
-                  onClick={() => setStep(1)}
-                  className="btn-secondary flex items-center gap-2"
-                >
-                  <ChevronLeft size={18} />
-                  Previous
-                </button>
-                <button 
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className="btn-primary flex items-center gap-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 size={18} className="animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      Create Assignment
-                      <ChevronRight size={18} />
-                    </>
-                  )}
-                </button>
+              <div className="flex flex-col gap-4 pt-4">
+                <p className="text-sm text-slate-600 font-medium">Choose how to proceed:</p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Create Full Paper */}
+                  <button 
+                    onClick={handleSubmit}
+                    disabled={isSubmitting || isCreatingQuiz}
+                    className="flex flex-col items-start gap-2 p-4 border-2 border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all disabled:opacity-50"
+                  >
+                    <div className="flex items-center gap-2">
+                      <BookOpen size={20} className="text-blue-600" />
+                      <span className="font-semibold text-slate-900">Full Question Paper</span>
+                    </div>
+                    <p className="text-xs text-slate-500">Generate complete question paper with answer key</p>
+                    {isSubmitting && <Loader2 size={16} className="animate-spin text-blue-600 mt-2" />}
+                  </button>
+
+                  {/* Create Quiz Only */}
+                  <button 
+                    onClick={handleCreateQuizOnly}
+                    disabled={isSubmitting || isCreatingQuiz || !file}
+                    className="flex flex-col items-start gap-2 p-4 border-2 border-slate-200 rounded-xl hover:border-green-300 hover:bg-green-50 transition-all disabled:opacity-50"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Zap size={20} className="text-green-600" />
+                      <span className="font-semibold text-slate-900">Quiz Only</span>
+                    </div>
+                    <p className="text-xs text-slate-500">Create MCQ quiz instantly with QR code</p>
+                    {isCreatingQuiz && <Loader2 size={16} className="animate-spin text-green-600 mt-2" />}
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                  <button 
+                    onClick={() => setStep(1)}
+                    className="btn-secondary flex items-center gap-2"
+                  >
+                    <ChevronLeft size={18} />
+                    Previous
+                  </button>
+                </div>
               </div>
             </div>
           )}

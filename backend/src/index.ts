@@ -7,6 +7,7 @@ import { createServer } from 'http';
 import { connectDB } from './config/db';
 import { initSocket } from './websocket/socket';
 import assignmentRoutes from './routes/assignments';
+import mcqRoutes from './routes/mcq';
 import path from 'path';
 
 dotenv.config();
@@ -18,7 +19,7 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: process.env.CLIENT_URL || ['http://localhost:3000', 'http://localhost:3002'],
   credentials: true
 }));
 app.use(morgan('dev'));
@@ -30,6 +31,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Routes
 app.use('/api/assignments', assignmentRoutes);
+app.use('/api', mcqRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

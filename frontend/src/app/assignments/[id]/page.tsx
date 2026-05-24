@@ -18,7 +18,10 @@ import {
   FileText,
   AlertCircle,
   Printer,
-  KeyRound
+  KeyRound,
+  Zap,
+  X,
+  BarChart3
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -30,10 +33,14 @@ export default function AssignmentDetailPage() {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [activeView, setActiveView] = useState<'paper' | 'answer-key'>('paper');
+  const [showMCQModal, setShowMCQModal] = useState(false);
+  const [isMCQGenerating, setIsMCQGenerating] = useState(false);
+  const [mcqAssignment, setMCQAssignment] = useState<any>(null);
 
   useEffect(() => {
     if (id) {
       fetchAssignment();
+      fetchMCQAssignment();
       const cleanup = setupSocket();
       return cleanup;
     }
@@ -69,6 +76,38 @@ export default function AssignmentDetailPage() {
       toast.error('Failed to load assignment');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchMCQAssignment = async () => {
+    try {
+      const res = await api.get(`/mcq/${id}`);
+      if (res.data.success) {
+        setMCQAssignment(res.data.mcqAssignment);
+      }
+    } catch (error) {
+      // MCQ not created yet, that's okay
+    }
+  };
+
+  const handleGenerateMCQ = async (mode: 'auto' | 'manual') => {
+    setIsMCQGenerating(true);
+    try {
+      if (mode === 'auto') {
+        const res = await api.post(`/mcq/${id}/generate`, {
+          title: `MCQ Quiz - ${currentAssignment?.title}`,
+          description: `Test your knowledge on ${currentAssignment?.subject}`,
+        });
+        if (res.data.success) {
+          setMCQAssignment(res.data.mcqAssignment);
+          toast.success('MCQs generated! Students can now scan the QR code.');
+          setShowMCQModal(false);
+        }
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to generate MCQs');
+    } finally {
+      setIsMCQGenerating(false);
     }
   };
 
@@ -201,6 +240,24 @@ export default function AssignmentDetailPage() {
                     {isDownloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
                     Download PDF
                   </button>
+
+                  <Link
+                    href={`/assignments/${id}/mcq`}
+                    className="btn-primary flex items-center gap-2"
+                  >
+                    <Zap size={16} />
+                    MCQ Quiz
+                  </Link>
+
+                  {mcqAssignment && (
+                    <Link
+                      href={`/assignments/${id}/results`}
+                      className="btn-secondary flex items-center gap-2"
+                    >
+                      <BarChart3 size={16} />
+                      Results
+                    </Link>
+                  )}
                 </>
               )}
               <button 

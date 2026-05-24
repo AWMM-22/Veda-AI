@@ -16,6 +16,7 @@ import {
   Bell,
   ChevronLeft,
   ChevronRight,
+  Trophy,
 } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 import { useState } from 'react';
@@ -24,6 +25,7 @@ const navItems = [
   { icon: Home, label: 'Home', href: '/' },
   { icon: Users, label: 'My Groups', href: '/groups' },
   { icon: FileText, label: 'Assignments', href: '/assignments' },
+  { icon: Trophy, label: 'Ranking', href: '/quizzes' },
   { icon: Wand2, label: "AI Teacher's Toolkit", href: '/toolkit' },
   { icon: BookOpen, label: 'My Library', href: '/library' },
 ];

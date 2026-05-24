@@ -81,3 +81,51 @@ export interface JobData {
   additionalInfo?: string;
   fileUrl?: string;
 }
+
+export interface MCQOption {
+  label: string; // A, B, C, D
+  text: string;
+}
+
+export interface MCQ {
+  _id?: string;
+  questionText: string;
+  options: MCQOption[];
+  correctAnswer: string; // A, B, C, or D
+  marks: number;
+  topic?: string;
+  difficulty?: 'easy' | 'medium' | 'hard';
+}
+
+export interface MCQAssignment {
+  _id?: string;
+  assignmentId: string;
+  mcqs: MCQ[];
+  title: string;
+  description?: string;
+  sharingToken: string;
+  qrCode?: string;
+  totalMarks: number;
+  timeLimit?: number;
+  status: 'draft' | 'active' | 'closed';
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface StudentResponseData {
+  questionIndex: number;
+  selectedAnswer: string;
+}
+
+export interface StudentResponse {
+  _id?: string;
+  mcqAssignmentId: string;
+  rollNumber: string;
+  studentName?: string;
+  responses: StudentResponseData[];
+  score: number;
+  totalMarks: number;
+  percentage: number;
+  submittedAt?: Date;
+  createdAt?: Date;
+}
