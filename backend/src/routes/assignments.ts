@@ -73,7 +73,7 @@ router.post('/', upload.single('file'), async (req: Request, res: Response) => {
       fileUrl: assignment.fileUrl
     }, {
       attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 }
+      backoff: { type: 'exponential' as any, delay: 2000 }
     });
 
     res.status(201).json({

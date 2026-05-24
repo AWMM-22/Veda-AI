@@ -78,7 +78,7 @@ export class RetrievalAgent {
     const output = await embedder(text, {
       pooling: 'mean',
       normalize: true,
-    }) as { data: Float32Array | number[] };
+    } as any) as { data: Float32Array | number[] };
 
     return Array.from(output.data as ArrayLike<number>);
   }
