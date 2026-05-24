@@ -178,7 +178,7 @@ export default function MCQManagementPage() {
               {/* Analytics Button */}
               {mcqAssignment?._id && (
                 <Link
-                  href={`/quiz/${mcqAssignment._id}/ranking`}
+                  href={`/quizzes/${mcqAssignment._id}/ranking`}
                   className="p-2 hover:bg-blue-100 rounded-lg transition text-blue-600"
                   title="View Rankings & Analytics"
                 >

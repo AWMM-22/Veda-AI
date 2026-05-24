@@ -133,7 +133,7 @@ export default function QuizzesPage() {
               {quizzes.map((quiz) => (
                 <Link
                   key={quiz._id}
-                  href={`/quiz/${quiz._id}/ranking`}
+                  href={`/quizzes/${quiz._id}/ranking`}
                   className="group panel p-6 hover:shadow-lg hover:border-blue-200 transition-all cursor-pointer"
                 >
                   <div className="flex items-start justify-between mb-4">
