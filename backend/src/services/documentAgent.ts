@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
+// @ts-ignore - pdf-parse doesn't have @types package
 import pdfParse from 'pdf-parse';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
 import { createCanvas } from '@napi-rs/canvas';

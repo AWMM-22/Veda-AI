@@ -101,11 +101,15 @@ export const startQuestionQueueEventForwarder = async (
 ): Promise<void> => {
   const subscriber = redis.duplicate();
 
-  await subscriber.subscribe(EVENTS_CHANNEL, (message) => {
-    try {
-      onEvent(JSON.parse(message) as QuestionQueueStatusEvent);
-    } catch (error) {
-      console.error('Failed to parse queue event:', error);
+  subscriber.on('message', (channel: string, message: string) => {
+    if (channel === EVENTS_CHANNEL) {
+      try {
+        onEvent(JSON.parse(message) as QuestionQueueStatusEvent);
+      } catch (error) {
+        console.error('Failed to parse queue event:', error);
+      }
     }
   });
+
+  await subscriber.subscribe(EVENTS_CHANNEL);
 };
