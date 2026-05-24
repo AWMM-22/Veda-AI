@@ -1,4 +1,5 @@
 import { JobData, Section, Question } from '../types';
+// @ts-ignore - uuid doesn't have typed import
 import { v4 as uuidv4 } from 'uuid';
 
 // Simulated AI service - Replace with actual LLM API call (Gemini, Groq, etc.)

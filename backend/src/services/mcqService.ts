@@ -1,4 +1,6 @@
+// @ts-ignore - qrcode doesn't have @types package
 import QRCode from 'qrcode';
+// @ts-ignore - uuid doesn't have typed import
 import { v4 as uuidv4 } from 'uuid';
 import { MCQ, MCQOption, Section, Question } from '../types';
 

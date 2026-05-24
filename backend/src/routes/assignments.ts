@@ -12,10 +12,10 @@ const router = Router();
 
 // Multer config
 const storage: StorageEngine = multer.diskStorage({
-  destination: (req: Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
+  destination: (req: any, file: any, cb: (error: Error | null, destination: string) => void) => {
     cb(null, 'uploads/');
   },
-  filename: (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
+  filename: (req: any, file: any, cb: (error: Error | null, filename: string) => void) => {
     const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
     cb(null, uniqueName);
   }
