@@ -24,6 +24,158 @@ const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 const router = express.Router();
 const BASE_URL = process.env.FRONTEND_URL || 'http://localhost:3002';
 
+// ⚠️ IMPORTANT: Keep specific routes BEFORE dynamic routes
+// This ensures /mcq/list matches before /mcq/:assignmentId
+
+/**
+ * GET /mcq/list
+ * Get all MCQ assignments (for ranking page)
+ */
+router.get('/mcq/list', async (req: Request, res: Response) => {
+  try {
+    const mcqAssignments = await MCQAssignmentModel.find()
+      .sort({ createdAt: -1 })
+      .select('_id title description totalMarks status createdAt');
+
+    // Get student count for each MCQ
+    const quizzes = await Promise.all(
+      mcqAssignments.map(async (mcq) => {
+        const studentCount = await StudentResponseModel.countDocuments({
+          mcqAssignmentId: mcq._id,
+        });
+        return {
+          _id: mcq._id,
+          title: mcq.title,
+          description: mcq.description,
+          totalMarks: mcq.totalMarks,
+          status: mcq.status,
+          studentCount,
+          createdAt: mcq.createdAt,
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      quizzes,
+    });
+  } catch (error: any) {
+    console.error('Error listing MCQs:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /quiz/:token
+ * Public endpoint - get quiz data for students (no auth required)
+ * MUST come before dynamic :assignmentId routes
+ */
+router.get('/quiz/:token', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+
+    const mcqAssignment = await MCQAssignmentModel.findOne({ sharingToken: token });
+    if (!mcqAssignment) {
+      return res.status(404).json({ error: 'Quiz not found' });
+    }
+
+    if (mcqAssignment.status !== 'active') {
+      return res.status(403).json({ error: 'This quiz is not available' });
+    }
+
+    // Return quiz without correct answers
+    res.json({
+      success: true,
+      quiz: {
+        _id: mcqAssignment._id,
+        title: mcqAssignment.title,
+        description: mcqAssignment.description,
+        totalQuestions: mcqAssignment.mcqs.length,
+        totalMarks: mcqAssignment.totalMarks,
+        timeLimit: mcqAssignment.timeLimit,
+        questions: mcqAssignment.mcqs.map((mcq, idx) => ({
+          id: idx,
+          questionText: mcq.questionText,
+          options: mcq.options,
+          marks: mcq.marks || 1,
+        })),
+      },
+    });
+  } catch (error: any) {
+    console.error('Error fetching quiz:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /quiz/:token/submit
+ * Student submits their responses
+ */
+router.post('/quiz/:token/submit', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const { rollNumber, studentName, responses } = req.body;
+
+    if (!rollNumber || !responses || !Array.isArray(responses)) {
+      return res.status(400).json({ error: 'Missing required fields: rollNumber, responses' });
+    }
+
+    const mcqAssignment = await MCQAssignmentModel.findOne({ sharingToken: token });
+    if (!mcqAssignment) {
+      return res.status(404).json({ error: 'Quiz not found' });
+    }
+
+    // Check if student already submitted
+    const existingResponse = await StudentResponseModel.findOne({
+      mcqAssignmentId: mcqAssignment._id,
+      rollNumber,
+    });
+
+    if (existingResponse) {
+      return res.status(400).json({ error: 'You have already submitted this quiz' });
+    }
+
+    // Calculate score
+    const mcqsArray = mcqAssignment.mcqs.map((mcq: any) => ({
+      questionText: mcq.questionText,
+      options: mcq.options,
+      correctAnswer: mcq.correctAnswer,
+      marks: mcq.marks || 1,
+      topic: mcq.topic,
+      difficulty: mcq.difficulty,
+    }));
+    const { score, totalMarks, percentage } = MCQService.calculateScore(mcqsArray, responses);
+
+    // Save student response
+    const studentResponse = new StudentResponseModel({
+      mcqAssignmentId: mcqAssignment._id,
+      rollNumber,
+      studentName: studentName || `Student-${rollNumber}`,
+      responses,
+      score,
+      totalMarks,
+      percentage,
+    });
+
+    await studentResponse.save();
+
+    res.json({
+      success: true,
+      message: 'Quiz submitted successfully',
+      result: {
+        score,
+        totalMarks,
+        percentage,
+        rollNumber,
+        studentName,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error submitting quiz:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 /**
  * POST /mcq/create-from-pdf
  * Create MCQs directly from uploaded PDF without full question paper
@@ -122,44 +274,6 @@ router.post('/mcq/create-from-pdf', upload.single('file'), async (req: Request, 
     });
   } catch (error: any) {
     console.error('Error creating MCQ from PDF:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-/**
- * GET /mcq/list
- * Get all MCQ assignments (for ranking page)
- */
-router.get('/mcq/list', async (req: Request, res: Response) => {
-  try {
-    const mcqAssignments = await MCQAssignmentModel.find()
-      .sort({ createdAt: -1 })
-      .select('_id title description totalMarks status createdAt');
-
-    // Get student count for each MCQ
-    const quizzes = await Promise.all(
-      mcqAssignments.map(async (mcq) => {
-        const studentCount = await StudentResponseModel.countDocuments({
-          mcqAssignmentId: mcq._id,
-        });
-        return {
-          _id: mcq._id,
-          title: mcq.title,
-          description: mcq.description,
-          totalMarks: mcq.totalMarks,
-          status: mcq.status,
-          studentCount,
-          createdAt: mcq.createdAt,
-        };
-      })
-    );
-
-    res.json({
-      success: true,
-      quizzes,
-    });
-  } catch (error: any) {
-    console.error('Error listing MCQs:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -366,116 +480,6 @@ router.patch('/mcq/:mcqAssignmentId/update', async (req: Request, res: Response)
     });
   } catch (error: any) {
     console.error('Error updating MCQ assignment:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-/**
- * GET /quiz/:token
- * Public endpoint - get quiz data for students (no auth required)
- */
-router.get('/quiz/:token', async (req: Request, res: Response) => {
-  try {
-    const { token } = req.params;
-
-    const mcqAssignment = await MCQAssignmentModel.findOne({ sharingToken: token });
-    if (!mcqAssignment) {
-      return res.status(404).json({ error: 'Quiz not found' });
-    }
-
-    if (mcqAssignment.status !== 'active') {
-      return res.status(403).json({ error: 'This quiz is not available' });
-    }
-
-    // Return quiz without correct answers
-    res.json({
-      success: true,
-      quiz: {
-        _id: mcqAssignment._id,
-        title: mcqAssignment.title,
-        description: mcqAssignment.description,
-        totalQuestions: mcqAssignment.mcqs.length,
-        totalMarks: mcqAssignment.totalMarks,
-        timeLimit: mcqAssignment.timeLimit,
-        questions: mcqAssignment.mcqs.map((mcq, idx) => ({
-          id: idx,
-          questionText: mcq.questionText,
-          options: mcq.options,
-          marks: mcq.marks || 1,
-        })),
-      },
-    });
-  } catch (error: any) {
-    console.error('Error fetching quiz:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-/**
- * POST /quiz/:token/submit
- * Student submits their responses
- */
-router.post('/quiz/:token/submit', async (req: Request, res: Response) => {
-  try {
-    const { token } = req.params;
-    const { rollNumber, studentName, responses } = req.body;
-
-    if (!rollNumber || !responses || !Array.isArray(responses)) {
-      return res.status(400).json({ error: 'Missing required fields: rollNumber, responses' });
-    }
-
-    const mcqAssignment = await MCQAssignmentModel.findOne({ sharingToken: token });
-    if (!mcqAssignment) {
-      return res.status(404).json({ error: 'Quiz not found' });
-    }
-
-    // Check if student already submitted
-    const existingResponse = await StudentResponseModel.findOne({
-      mcqAssignmentId: mcqAssignment._id,
-      rollNumber,
-    });
-
-    if (existingResponse) {
-      return res.status(400).json({ error: 'You have already submitted this quiz' });
-    }
-
-    // Calculate score
-    const mcqsArray = mcqAssignment.mcqs.map((mcq: any) => ({
-      questionText: mcq.questionText,
-      options: mcq.options,
-      correctAnswer: mcq.correctAnswer,
-      marks: mcq.marks || 1,
-      topic: mcq.topic,
-      difficulty: mcq.difficulty,
-    }));
-    const { score, totalMarks, percentage } = MCQService.calculateScore(mcqsArray, responses);
-
-    // Save student response
-    const studentResponse = new StudentResponseModel({
-      mcqAssignmentId: mcqAssignment._id,
-      rollNumber,
-      studentName: studentName || `Student-${rollNumber}`,
-      responses,
-      score,
-      totalMarks,
-      percentage,
-    });
-
-    await studentResponse.save();
-
-    res.json({
-      success: true,
-      message: 'Quiz submitted successfully',
-      result: {
-        score,
-        totalMarks,
-        percentage,
-        rollNumber,
-        studentName,
-      },
-    });
-  } catch (error: any) {
-    console.error('Error submitting quiz:', error);
     res.status(500).json({ error: error.message });
   }
 });
