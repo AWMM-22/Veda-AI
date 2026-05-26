@@ -85,8 +85,13 @@ export default function AssignmentDetailPage() {
       if (res.data.success) {
         setMCQAssignment(res.data.mcqAssignment);
       }
-    } catch (error) {
-      // MCQ not created yet, that's okay
+    } catch (error: any) {
+      // MCQ not created yet or doesn't exist - this is normal
+      if (error.response?.status === 404) {
+        // Silent fail - MCQ doesn't exist yet
+      } else {
+        console.error('Error fetching MCQ:', error);
+      }
     }
   };
 

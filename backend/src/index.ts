@@ -21,7 +21,7 @@ app.use(helmet());
 
 const allowedOrigins = process.env.CLIENT_URL
   ? process.env.CLIENT_URL.split(",").map(url => url.trim())
-  : [];
+  : ["http://localhost:3000", "http://localhost:3002"];
 
 app.use(
   cors({
@@ -29,6 +29,7 @@ app.use(
     credentials: true
   })
 );
+app.options("*", cors());
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
