@@ -29,7 +29,6 @@ flowchart TD
     E -- Future: Integrate More AI Providers --> J[Other AI API]
     B -- Future: Integrate School Systems --> K[School System API]
 
-```
 ## Architecture Overview
 
 ```
