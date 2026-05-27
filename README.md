@@ -8,27 +8,7 @@ Key features include a queue-based asynchronous processing pipeline, modular ser
 
 ## System Overview
 
-> **⚠️ Note:**  
-> The `mermaid` diagrams below will not render directly on GitHub.  
-> To view them as diagrams, use a compatible Markdown editor (like VS Code with a Mermaid plugin), or copy the blocks into the [Mermaid Live Editor](https://mermaid-js.github.io/mermaid-live-editor/).
-
-```mermaid
-flowchart TD
-    A[Client (Frontend)] -- POST /api/assignments --> B[RESTful API (Express)]
-    B -- Validation & Save (status: pending) --> C[MongoDB]
-    B -- Add Assignment Job --> D[BullMQ Queue (Redis)]
-    D -- Job Pickup --> E[AI Worker]
-    E -- Chunk Input Data --> F[Chunked Data]
-    F -- Send To LLM (Gemini/Groq) --> G[LLM API]
-    G -- Receive Questions/Answers --> E
-    E -- Save Results (status: completed) --> C
-    E -- Generate PDF (Puppeteer) --> H[PDF Service]
-    H -- Store/Retrieve PDF --> C
-    E -- Emit WebSocket Update --> I[WebSocket Server]
-    I -- Push Status/Results --> A
-    E -- Future: Integrate More AI Providers --> J[Other AI API]
-    B -- Future: Integrate School Systems --> K[School System API]
-```
+The VedaAI platform follows a queue-based architecture for processing assignment generation requests. When a client (the frontend application) submits a new assignment through a POST request to the RESTful API (built with Express), the API validates and saves this assignment to MongoDB with an initial status set as “pending.” Simultaneously, it enqueues a job into the BullMQ queue, which uses Redis in the background. An AI Worker then picks up this job from the queue, breaks the assignment data into manageable chunks, and sends each chunk to an integrated Large Language Model (LLM), such as Gemini or Groq. The LLM returns generated questions and answers, which the worker aggregates and saves back to MongoDB, updating the assignment’s status to “completed.” The worker also generates a formatted PDF (using Puppeteer) and stores it in the database. Throughout the process, real-time status and result updates are pushed to clients via a WebSocket server. The architecture is modular, allowing easy integration of future AI providers or external school systems. This asynchronous model ensures scalability, responsiveness, and a seamless user experience without API timeouts.
 
 ## Architecture Overview
 
