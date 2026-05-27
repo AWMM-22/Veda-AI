@@ -4,14 +4,14 @@ VedaAI is a robust, scalable Node.js + Express + TypeScript application powering
 It provides an end-to-end workflow for generating, storing, and distributing AI-generated assignments for educational purposes.
 Key features include a queue-based asynchronous processing pipeline, modular service layer, integration with state-of-the-art LLMs for question generation, PDF export, and real-time status updates via WebSocket.
 
-System Overview
+---
 
-The backend accepts assignment creation requests through a RESTful API. To ensure high reliability and scalability, every incoming assignment is processed asynchronously via a job queue powered by BullMQ and Redis.
-Each assignment document, along with its settings, is stored in MongoDB using a type-safe schema.
-Assignment generation leverages an AI service (via LLM APIs such as Gemini or Groq). To maximize the accuracy of generated content and minimize hallucination, the system implements chunking—large pieces of input data are divided into manageable chunks before being sent to the LLM, ensuring deterministic outputs and context integrity.
-Generated assignments are rendered and exported as PDFs via a dedicated service using Puppeteer.
-Real-time status updates are delivered to connected clients over WebSocket, enabling transparent multi-user collaboration and monitoring.
-The design is extensible, supporting future integrations with new AI providers and external school systems.
+## System Overview
+
+> **⚠️ Note:**  
+> The `mermaid` diagrams below will not render directly on GitHub.  
+> To view them as diagrams, use a compatible Markdown editor (like VS Code with a Mermaid plugin), or copy the blocks into the [Mermaid Live Editor](https://mermaid-js.github.io/mermaid-live-editor/).
+
 ```mermaid
 flowchart TD
     A[Client (Frontend)] -- POST /api/assignments --> B[RESTful API (Express)]
@@ -28,6 +28,7 @@ flowchart TD
     I -- Push Status/Results --> A
     E -- Future: Integrate More AI Providers --> J[Other AI API]
     B -- Future: Integrate School Systems --> K[School System API]
+```
 
 ## Architecture Overview
 
@@ -46,8 +47,16 @@ flowchart TD
                         │  (Question Gen) │
                         └─────────────────┘
 ```
-##System architecture
+
+---
+
+## System architecture
+
 ### Queue-Based Assignment Processing Flow
+
+> **⚠️ Note:**  
+> The `mermaid` diagrams below will not render directly on GitHub.  
+> To view them, use a compatible Markdown editor or the [Mermaid Live Editor](https://mermaid-js.github.io/mermaid-live-editor/).
 
 ```mermaid
 flowchart TD
@@ -62,6 +71,9 @@ flowchart TD
     E -- "Emit Updates" --> H[WebSocket Server]
     H -- "Push Status" --> A
 ```
+
+---
+
 ## Project Structure
 
 ```
@@ -83,12 +95,14 @@ veda-ai/
     ├── src/
     │   ├── app/              # Next.js App Router
     │   ├── components/       # React components
-    │   ├── store/             # Zustand state management
-    │   ├── lib/               # API & Socket clients
-    │   └── types/             # TypeScript types
+    │   ├── store/            # Zustand state management
+    │   ├── lib/              # API & Socket clients
+    │   └── types/            # TypeScript types
     ├── package.json
     └── tailwind.config.ts
 ```
+
+---
 
 ## Tech Stack
 
@@ -116,6 +130,8 @@ veda-ai/
 - Structured prompt generation
 - Parsed response handling
 
+---
+
 ## Features
 
 ### Core
@@ -133,6 +149,8 @@ veda-ai/
 - ✅ Collapsible sidebar
 - ✅ Search & filter assignments
 - ✅ Queue-based background processing
+
+---
 
 ## Getting Started
 
@@ -185,35 +203,39 @@ NODE_ENV=development
 NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
 ```
 
+---
+
 ## API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/assignments` | Create assignment |
-| GET | `/api/assignments` | List assignments |
-| GET | `/api/assignments/:id` | Get assignment |
-| DELETE | `/api/assignments/:id` | Delete assignment |
-| POST | `/api/assignments/:id/regenerate` | Regenerate questions |
-| GET | `/api/assignments/:id/pdf` | Download PDF |
+| POST   | `/api/assignments`            | Create assignment           |
+| GET    | `/api/assignments`            | List assignments           |
+| GET    | `/api/assignments/:id`        | Get assignment             |
+| DELETE | `/api/assignments/:id`        | Delete assignment          |
+| POST   | `/api/assignments/:id/regenerate` | Regenerate questions      |
+| GET    | `/api/assignments/:id/pdf`    | Download PDF               |
+
+---
 
 ## WebSocket Events
 
-| Event | Direction | Description |
-|-------|-----------|-------------|
-| `join-assignment` | Client → Server | Join room for updates |
-| `status-update` | Server → Client | Assignment status change |
+| Event             | Direction         | Description                  |
+|-------------------|------------------|------------------------------|
+| `join-assignment` | Client → Server  | Join room for updates        |
+| `status-update`   | Server → Client  | Assignment status change     |
+
+---
 
 ## Approach
 
 1. **Queue-Based Architecture**: BullMQ handles AI generation asynchronously, preventing API timeouts and enabling retries.
-
 2. **Real-Time Updates**: Socket.IO rooms notify clients when generation completes, eliminating polling.
-
 3. **State Management**: Zustand provides simple, performant state sharing across components.
-
 4. **PDF Generation**: Puppeteer renders styled HTML to PDF, ensuring consistent formatting across browsers.
-
 5. **Responsive Design**: Mobile-first approach with collapsible sidebar and adaptive layouts.
+
+---
 
 ## License
 
