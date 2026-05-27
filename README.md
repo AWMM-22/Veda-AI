@@ -14,24 +14,22 @@ Real-time status updates are delivered to connected clients over WebSocket, enab
 The design is extensible, supporting future integrations with new AI providers and external school systems.
 ```mermaid
 flowchart TD
-    A[Client (Frontend)] -- "POST /api/assignments" --> B[RESTful API (Express)]
-    B -- "Validation & Save (status: pending)" --> C[MongoDB]
-    B -- "Add Assignment Job" --> D[BullMQ Queue (Redis)]
-    D -- "Job Pickup" --> E[AI Worker]
-    E -- "Chunk Input Data" --> F[Chunked Data]
-    F -- "Send To LLM (Gemini/Groq)" --> G[LLM API]
-    G -- "Receive Questions/Answers" --> E
-    E -- "Save Results (status: completed)" --> C
-    E -- "Generate PDF (Puppeteer)" --> H[PDF Service]
-    H -- "Store/Retrieve PDF" --> C
-    E -- "Emit WebSocket Update" --> I[WebSocket Server]
-    I -- "Push Status/Results" --> A
+    A[Client (Frontend)] -- POST /api/assignments --> B[RESTful API (Express)]
+    B -- Validation & Save (status: pending) --> C[MongoDB]
+    B -- Add Assignment Job --> D[BullMQ Queue (Redis)]
+    D -- Job Pickup --> E[AI Worker]
+    E -- Chunk Input Data --> F[Chunked Data]
+    F -- Send To LLM (Gemini/Groq) --> G[LLM API]
+    G -- Receive Questions/Answers --> E
+    E -- Save Results (status: completed) --> C
+    E -- Generate PDF (Puppeteer) --> H[PDF Service]
+    H -- Store/Retrieve PDF --> C
+    E -- Emit WebSocket Update --> I[WebSocket Server]
+    I -- Push Status/Results --> A
+    E -- Future: Integrate More AI Providers --> J[Other AI API]
+    B -- Future: Integrate School Systems --> K[School System API]
 
-    %% Additional extensibility
-    E -- "Future: Integrate More AI Providers"--> J[Other AI API]
-    B -- "Future: Integrate School Systems" --> K[School System API]
 ```
-
 ## Architecture Overview
 
 ```
