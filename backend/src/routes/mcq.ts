@@ -22,7 +22,104 @@ const storage: StorageEngine = multer.diskStorage({
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 const router = express.Router();
-const BASE_URL = process.env.FRONTEND_URL || 'http://localhost:3002';
+const BASE_URL = process.env.FRONTEND_URL || process.env.CLIENT_URL?.split(',')[0] || 'http://localhost:3002';
+
+const buildExamPayload = (mcqAssignment: any) => ({
+  _id: mcqAssignment._id,
+  title: mcqAssignment.title,
+  description: mcqAssignment.description,
+  totalQuestions: mcqAssignment.mcqs.length,
+  totalMarks: mcqAssignment.totalMarks,
+  timeLimit: mcqAssignment.timeLimit,
+  examId: mcqAssignment.examId || mcqAssignment.sharingToken,
+  questions: mcqAssignment.mcqs.map((mcq: any, idx: number) => ({
+    id: idx,
+    questionText: mcq.questionText,
+    options: mcq.options,
+    marks: mcq.marks || 1,
+  })),
+});
+
+const findExamById = async (examId: string) => {
+  return MCQAssignmentModel.findOne({
+    $or: [{ examId }, { sharingToken: examId }],
+  });
+};
+
+const respondWithExam = async (req: Request, res: Response, examId: string) => {
+  const mcqAssignment = await findExamById(examId);
+  if (!mcqAssignment) {
+    return res.status(404).json({ error: 'Exam not found' });
+  }
+
+  if (mcqAssignment.status !== 'active') {
+    return res.status(403).json({ error: 'This exam is not available' });
+  }
+
+  res.json({ success: true, quiz: buildExamPayload(mcqAssignment) });
+};
+
+const submitExam = async (req: Request, res: Response, examId: string) => {
+  try {
+    const { rollNumber, studentName, responses } = req.body;
+
+    if (!rollNumber || !responses || !Array.isArray(responses)) {
+      return res.status(400).json({ error: 'Missing required fields: rollNumber, responses' });
+    }
+
+    const mcqAssignment = await findExamById(examId);
+    if (!mcqAssignment) {
+      return res.status(404).json({ error: 'Exam not found' });
+    }
+
+    const existingResponse = await StudentResponseModel.findOne({
+      examId: mcqAssignment.examId || mcqAssignment.sharingToken,
+      rollNumber,
+    });
+
+    if (existingResponse) {
+      return res.status(400).json({ error: 'You have already submitted this exam' });
+    }
+
+    const mcqsArray = mcqAssignment.mcqs.map((mcq: any) => ({
+      questionText: mcq.questionText,
+      options: mcq.options,
+      correctAnswer: mcq.correctAnswer,
+      marks: mcq.marks || 1,
+      topic: mcq.topic,
+      difficulty: mcq.difficulty,
+    }));
+    const { score, totalMarks, percentage } = MCQService.calculateScore(mcqsArray, responses);
+
+    const studentResponse = new StudentResponseModel({
+      mcqAssignmentId: mcqAssignment._id,
+      examId: mcqAssignment.examId || mcqAssignment.sharingToken,
+      rollNumber,
+      studentName: studentName || `Student-${rollNumber}`,
+      responses,
+      score,
+      totalMarks,
+      percentage,
+    });
+
+    await studentResponse.save();
+
+    res.json({
+      success: true,
+      message: 'Exam submitted successfully',
+      result: {
+        score,
+        totalMarks,
+        percentage,
+        rollNumber,
+        studentName: studentName || `Student-${rollNumber}`,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error submitting exam:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
 
 // ⚠️ IMPORTANT: Keep specific routes BEFORE dynamic routes
 // This ensures /mcq/list matches before /mcq/:assignmentId
@@ -66,114 +163,35 @@ router.get('/mcq/list', async (req: Request, res: Response) => {
 });
 
 /**
- * GET /quiz/:token
- * Public endpoint - get quiz data for students (no auth required)
- * MUST come before dynamic :assignmentId routes
+ * GET /exam/:examId
+ * Public endpoint for students.
  */
-router.get('/quiz/:token', async (req: Request, res: Response) => {
+router.get('/exam/:examId', async (req: Request, res: Response) => {
   try {
-    const { token } = req.params;
-
-    const mcqAssignment = await MCQAssignmentModel.findOne({ sharingToken: token });
-    if (!mcqAssignment) {
-      return res.status(404).json({ error: 'Quiz not found' });
-    }
-
-    if (mcqAssignment.status !== 'active') {
-      return res.status(403).json({ error: 'This quiz is not available' });
-    }
-
-    // Return quiz without correct answers
-    res.json({
-      success: true,
-      quiz: {
-        _id: mcqAssignment._id,
-        title: mcqAssignment.title,
-        description: mcqAssignment.description,
-        totalQuestions: mcqAssignment.mcqs.length,
-        totalMarks: mcqAssignment.totalMarks,
-        timeLimit: mcqAssignment.timeLimit,
-        questions: mcqAssignment.mcqs.map((mcq, idx) => ({
-          id: idx,
-          questionText: mcq.questionText,
-          options: mcq.options,
-          marks: mcq.marks || 1,
-        })),
-      },
-    });
+    await respondWithExam(req, res, req.params.examId);
   } catch (error: any) {
-    console.error('Error fetching quiz:', error);
+    console.error('Error fetching exam:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 /**
- * POST /quiz/:token/submit
- * Student submits their responses
+ * POST /exam/:examId/submit
+ * Student submits responses.
  */
+router.post('/exam/:examId/submit', async (req: Request, res: Response) => {
+  await submitExam(req, res, req.params.examId);
+});
+
+/**
+ * Backward compatible quiz aliases.
+ */
+router.get('/quiz/:token', async (req: Request, res: Response) => {
+  await respondWithExam(req, res, req.params.token);
+});
+
 router.post('/quiz/:token/submit', async (req: Request, res: Response) => {
-  try {
-    const { token } = req.params;
-    const { rollNumber, studentName, responses } = req.body;
-
-    if (!rollNumber || !responses || !Array.isArray(responses)) {
-      return res.status(400).json({ error: 'Missing required fields: rollNumber, responses' });
-    }
-
-    const mcqAssignment = await MCQAssignmentModel.findOne({ sharingToken: token });
-    if (!mcqAssignment) {
-      return res.status(404).json({ error: 'Quiz not found' });
-    }
-
-    // Check if student already submitted
-    const existingResponse = await StudentResponseModel.findOne({
-      mcqAssignmentId: mcqAssignment._id,
-      rollNumber,
-    });
-
-    if (existingResponse) {
-      return res.status(400).json({ error: 'You have already submitted this quiz' });
-    }
-
-    // Calculate score
-    const mcqsArray = mcqAssignment.mcqs.map((mcq: any) => ({
-      questionText: mcq.questionText,
-      options: mcq.options,
-      correctAnswer: mcq.correctAnswer,
-      marks: mcq.marks || 1,
-      topic: mcq.topic,
-      difficulty: mcq.difficulty,
-    }));
-    const { score, totalMarks, percentage } = MCQService.calculateScore(mcqsArray, responses);
-
-    // Save student response
-    const studentResponse = new StudentResponseModel({
-      mcqAssignmentId: mcqAssignment._id,
-      rollNumber,
-      studentName: studentName || `Student-${rollNumber}`,
-      responses,
-      score,
-      totalMarks,
-      percentage,
-    });
-
-    await studentResponse.save();
-
-    res.json({
-      success: true,
-      message: 'Quiz submitted successfully',
-      result: {
-        score,
-        totalMarks,
-        percentage,
-        rollNumber,
-        studentName,
-      },
-    });
-  } catch (error: any) {
-    console.error('Error submitting quiz:', error);
-    res.status(500).json({ error: error.message });
-  }
+  await submitExam(req, res, req.params.token);
 });
 
 /**
@@ -217,28 +235,16 @@ router.post('/mcq/create-from-pdf', upload.single('file'), async (req: Request, 
     const mcqs: MCQ[] = [];
     const chunks = parsedDoc.chunks.slice(0, 20); // Limit to 20 chunks for MCQ generation
     
-    chunks.forEach((chunk, idx) => {
-      // Create a simple MCQ from each chunk
+    for (const [idx, chunk] of chunks.entries()) {
       const words = chunk.split(' ');
-      const questionStart = words.slice(0, Math.min(10, words.length)).join(' ');
-      
-      mcqs.push({
-        questionText: `What is mentioned about: "${questionStart}..."?`,
-        options: [
-          { label: 'A', text: 'It is important and relevant' },
-          { label: 'B', text: 'It is secondary information' },
-          { label: 'C', text: 'It is mentioned in passing' },
-          { label: 'D', text: 'It is not clearly stated' },
-        ],
-        correctAnswer: 'A',
-        marks: 1,
-        topic: `Topic ${idx + 1}`,
-        difficulty: 'medium',
-      });
-    });
+      const questionStart = words.slice(0, Math.min(18, words.length)).join(' ');
+      const sourceQuestion = `What is the key idea described in this passage: "${questionStart}..."?`;
 
-    // Create sharing link and QR code
-    const { token, qrCode, link } = await MCQService.createSharingLink(BASE_URL);
+      mcqs.push(await MCQService.generateMCQFromText(sourceQuestion, 1, idx));
+    }
+
+    // Create exam link and QR code
+    const { examId, qrCode, link } = await MCQService.createSharingLink(BASE_URL, undefined, 'exam');
 
     // Calculate total marks
     const totalMarks = mcqs.length;
@@ -246,11 +252,13 @@ router.post('/mcq/create-from-pdf', upload.single('file'), async (req: Request, 
     // Create MCQAssignment
     const mcqAssignment = new MCQAssignmentModel({
       assignmentId: assignment._id,
+      examId,
       mcqs,
       title: title,
       description: description || `MCQ Quiz from ${title}`,
-      sharingToken: token,
+      sharingToken: examId,
       qrCode,
+      qrUrl: link,
       totalMarks,
       status: 'active', // Auto-activate for quick sharing
     });
@@ -265,9 +273,11 @@ router.post('/mcq/create-from-pdf', upload.single('file'), async (req: Request, 
         description: mcqAssignment.description,
         totalQuestions: mcqs.length,
         totalMarks,
-        sharingToken: token,
+        examId,
+        sharingToken: examId,
         qrCode,
         quizLink: link,
+        qrUrl: link,
         status: 'active',
         assignmentId: assignment._id,
       },
@@ -294,10 +304,10 @@ router.post('/mcq/:assignmentId/generate', async (req: Request, res: Response) =
     }
 
     // Generate MCQs from sections
-    const mcqs = MCQService.generateFromQuestionPaper(assignment.sections || []);
+    const mcqs = await MCQService.generateFromQuestionPaper(assignment.sections || []);
 
-    // Create sharing link and QR code
-    const { token, qrCode, link } = await MCQService.createSharingLink(BASE_URL);
+    // Create exam link and QR code
+    const { examId, qrCode, link } = await MCQService.createSharingLink(BASE_URL, undefined, 'exam');
 
     // Calculate total marks (1 mark per question)
     const totalMarks = mcqs.length;
@@ -305,11 +315,13 @@ router.post('/mcq/:assignmentId/generate', async (req: Request, res: Response) =
     // Create MCQAssignment
     const mcqAssignment = new MCQAssignmentModel({
       assignmentId,
+      examId,
       mcqs,
       title: title || `MCQ Quiz - ${assignment.title}`,
       description,
-      sharingToken: token,
+      sharingToken: examId,
       qrCode,
+      qrUrl: link,
       totalMarks,
       status: 'draft',
     });
@@ -324,9 +336,11 @@ router.post('/mcq/:assignmentId/generate', async (req: Request, res: Response) =
         description: mcqAssignment.description,
         totalQuestions: mcqs.length,
         totalMarks,
-        sharingToken: token,
+        examId,
+        sharingToken: examId,
         qrCode,
         quizLink: link,
+        qrUrl: link,
         status: 'draft',
       },
     });
@@ -358,8 +372,8 @@ router.post('/mcq/:assignmentId/create', async (req: Request, res: Response) => 
       return res.status(400).json({ error: 'Invalid MCQs', details: validationErrors });
     }
 
-    // Create sharing link and QR code
-    const { token, qrCode, link } = await MCQService.createSharingLink(BASE_URL);
+    // Create exam link and QR code
+    const { examId, qrCode, link } = await MCQService.createSharingLink(BASE_URL, undefined, 'exam');
 
     // Calculate total marks
     const totalMarks = mcqs.reduce((sum: number, mcq: MCQ) => sum + (mcq.marks || 1), 0);
@@ -367,11 +381,13 @@ router.post('/mcq/:assignmentId/create', async (req: Request, res: Response) => 
     // Create MCQAssignment
     const mcqAssignment = new MCQAssignmentModel({
       assignmentId,
+      examId,
       mcqs,
       title,
       description,
-      sharingToken: token,
+      sharingToken: examId,
       qrCode,
+      qrUrl: link,
       totalMarks,
       status: 'draft',
     });
@@ -386,9 +402,11 @@ router.post('/mcq/:assignmentId/create', async (req: Request, res: Response) => 
         description: mcqAssignment.description,
         totalQuestions: mcqs.length,
         totalMarks,
-        sharingToken: token,
+        examId,
+        sharingToken: examId,
         qrCode,
         quizLink: link,
+        qrUrl: link,
         status: 'draft',
       },
     });
@@ -411,7 +429,8 @@ router.get('/mcq/:assignmentId', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'MCQ Assignment not found' });
     }
 
-    const quizLink = `${BASE_URL}/quiz/${mcqAssignment.sharingToken}`;
+    const examId = mcqAssignment.examId || mcqAssignment.sharingToken;
+    const quizLink = mcqAssignment.qrUrl || `${BASE_URL}/exam/${examId}`;
 
     res.json({
       success: true,
@@ -421,8 +440,10 @@ router.get('/mcq/:assignmentId', async (req: Request, res: Response) => {
         description: mcqAssignment.description,
         totalQuestions: mcqAssignment.mcqs.length,
         totalMarks: mcqAssignment.totalMarks,
+        examId,
         sharingToken: mcqAssignment.sharingToken,
         qrCode: mcqAssignment.qrCode,
+        qrUrl: quizLink,
         quizLink,
         status: mcqAssignment.status,
         mcqs: mcqAssignment.mcqs,

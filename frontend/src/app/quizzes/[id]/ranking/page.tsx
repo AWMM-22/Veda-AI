@@ -88,7 +88,7 @@ export default function QuizRankingPage() {
         <AppSidebar />
         <main
           className={`transition-all duration-300 min-h-screen ${
-            sidebarOpen ? 'lg:ml-[19rem]' : 'lg:ml-[6.5rem]'
+            sidebarOpen ? 'lg:ml-64' : 'lg:ml-20'
           } pt-20 lg:pt-4`}
         >
           <div className="page-container py-3 lg:py-4 max-w-[1160px] flex items-center justify-center h-96">
@@ -108,7 +108,7 @@ export default function QuizRankingPage() {
         <AppSidebar />
         <main
           className={`transition-all duration-300 min-h-screen ${
-            sidebarOpen ? 'lg:ml-[19rem]' : 'lg:ml-[6.5rem]'
+            sidebarOpen ? 'lg:ml-64' : 'lg:ml-20'
           } pt-20 lg:pt-4`}
         >
           <div className="page-container py-3 lg:py-4 max-w-[1160px]">
@@ -132,7 +132,7 @@ export default function QuizRankingPage() {
 
       <main
         className={`transition-all duration-300 min-h-screen ${
-          sidebarOpen ? 'lg:ml-[19rem]' : 'lg:ml-[6.5rem]'
+          sidebarOpen ? 'lg:ml-64' : 'lg:ml-20'
         } pt-20 lg:pt-4`}
       >
         <div className="page-container py-3 lg:py-4 max-w-[1160px] space-y-6">

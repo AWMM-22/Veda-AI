@@ -267,7 +267,7 @@ export default function QuizPage() {
 
             <div>
               <label className="block text-sm font-semibold text-slate-900 mb-2">
-                Name (Optional)
+                Name *
               </label>
               <input
                 type="text"
@@ -281,7 +281,8 @@ export default function QuizPage() {
 
           <button
             onClick={() => setStarted(true)}
-            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-lg font-bold transition text-lg"
+            disabled={!rollNumber.trim() || !studentName.trim()}
+            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:cursor-not-allowed disabled:opacity-60 text-white px-6 py-3 rounded-lg font-bold transition text-lg"
           >
             Start Quiz
           </button>
@@ -298,6 +299,10 @@ export default function QuizPage() {
         <div className="bg-white rounded-xl shadow-md p-4 mb-6 flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">{quiz.title}</h1>
+              <div>
+                <p className="text-sm font-medium text-slate-600">Name</p>
+                <p className="text-lg font-bold text-slate-900">{result.studentName || studentName}</p>
+              </div>
             <p className="text-sm text-slate-600">Roll: {rollNumber}</p>
           </div>
           {timeLeft !== null && (

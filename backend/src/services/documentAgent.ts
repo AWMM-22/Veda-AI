@@ -81,22 +81,27 @@ export class DocumentAgent {
       return [];
     }
 
+    // Split by sentences first
+    const sentences = text
+      .split(/(?<=[.!?])\s+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+
     const chunks: string[] = [];
-    let cursor = 0;
+    let currentChunk = '';
 
-    while (cursor < text.length) {
-      const end = Math.min(text.length, cursor + chunkSize);
-      const chunk = text.slice(cursor, end).trim();
-
-      if (chunk) {
-        chunks.push(chunk);
+    for (const sentence of sentences) {
+      // If adding this sentence exceeds chunk size, start a new chunk
+      if ((currentChunk + ' ' + sentence).length > chunkSize && currentChunk.length > 0) {
+        chunks.push(currentChunk.trim());
+        currentChunk = sentence;
+      } else {
+        currentChunk += (currentChunk ? ' ' : '') + sentence;
       }
+    }
 
-      if (end >= text.length) {
-        break;
-      }
-
-      cursor = Math.max(end - overlap, cursor + 1);
+    if (currentChunk.trim()) {
+      chunks.push(currentChunk.trim());
     }
 
     return chunks;

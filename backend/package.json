@@ -7,7 +7,8 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "start": "concurrently \"node dist/index.js\" \"node dist/workers/questionGenerator.js\"",
-    "worker": "ts-node-dev --respawn --transpile-only src/workers/questionGenerator.ts"
+    "worker": "ts-node-dev --respawn --transpile-only src/workers/questionGenerator.ts",
+    "regenerate-qrcodes": "ts-node src/scripts/regenerateQRCodes.ts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.0",

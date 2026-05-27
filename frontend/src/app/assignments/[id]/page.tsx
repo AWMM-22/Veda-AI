@@ -191,7 +191,7 @@ export default function AssignmentDetailPage() {
 
       <main 
         className={`transition-all duration-300 min-h-screen
-          ${sidebarOpen ? 'lg:ml-[19rem]' : 'lg:ml-[6.5rem]'}
+          ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-20'}
           pt-20 lg:pt-4
         `}
       >

@@ -2,21 +2,292 @@ import { JobData, Section, Question } from '../types';
 // @ts-ignore - uuid doesn't have typed import
 import { v4 as uuidv4 } from 'uuid';
 
-// Simulated AI service - Replace with actual LLM API call (Gemini, Groq, etc.)
 export class AIService {
+  private static readonly GROQ_API_KEY = process.env.GROQ_API_KEY;
+  private static readonly GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+  private static readonly GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  private static readonly GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta2/models/text-bison-001:generate';
+
   static async generateQuestions(jobData: JobData): Promise<{ sections: Section[]; answerKey: string[]; timeAllowed: number }> {
+    const { title, subject, className, questionTypes, additionalInfo, fileUrl } = jobData;
+
+    try {
+      // Try to use available AI models (Groq and/or Gemini)
+      if ((this.GROQ_API_KEY || this.GEMINI_API_KEY) && additionalInfo) {
+        return await this.generateQuestionsWithModels(jobData);
+      }
+    } catch (error) {
+      console.error('AI generation error, falling back to template generation:', error);
+    }
+
+    // Fallback to template-based generation
+    return this.generateQuestionsFromTemplates(jobData);
+  }
+
+  private static async generateQuestionsWithGroq(jobData: JobData): Promise<{ sections: Section[]; answerKey: string[]; timeAllowed: number }> {
     const { title, subject, className, questionTypes, additionalInfo } = jobData;
+    const sections: Section[] = [];
+    const answerKey: string[] = [];
+    let questionCounter = 1;
 
-    // In production, this would call Gemini/Groq API:
-    // const response = await llmClient.generate({...})
+    for (let i = 0; i < questionTypes.length; i++) {
+      const qt = questionTypes[i];
+      const sectionQuestions: Question[] = [];
 
-    // Simulating structured AI response based on inputs
+      const prompt = `Generate ${qt.count} unique and well-structured ${qt.type} questions on the subject "${subject}" for class ${className}.
+Topic: ${title}
+Additional context: ${additionalInfo}
+
+Requirements:
+- Create ${qt.count} distinct questions with varied difficulty (Easy/Moderate/Hard)
+- Each question should be clear and well-formatted
+- Make questions engaging and based on real-world concepts
+- Format as JSON array with structure: [{"text": "question", "difficulty": "Easy|Moderate|Hard"}, ...]
+
+Return ONLY valid JSON array, no additional text.`;
+
+      try {
+        const response = await fetch(this.GROQ_API_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.GROQ_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'mixtral-8x7b-32768',
+            messages: [
+              {
+                role: 'user',
+                content: prompt
+              }
+            ],
+            temperature: 0.7,
+            max_tokens: 2000,
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Groq API error: ${response.statusText}`);
+        }
+
+        const data = (await response.json()) as any;
+        const content = data.choices?.[0]?.message?.content || '';
+        
+        // Parse JSON response
+        const jsonMatch = content.match(/\[[\s\S]*\]/);
+        const generatedQuestions = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+
+        for (const q of generatedQuestions) {
+          sectionQuestions.push({
+            id: `q-${questionCounter}`,
+            text: q.text || `Question ${questionCounter}`,
+            difficulty: q.difficulty || 'Moderate',
+            marks: qt.marks
+          });
+
+          // Generate answer hint using AI
+          const answerHint = await this.generateAnswerWithGroq(q.text, subject);
+          answerKey.push(`${questionCounter}. ${answerHint}`);
+          questionCounter++;
+        }
+      } catch (error) {
+        console.error(`Error generating questions for section ${i + 1}:`, error);
+        // Fallback to template generation for this section
+        for (let j = 0; j < qt.count; j++) {
+          const questionText = this.generateQuestionText(qt.type, subject, 'Moderate', questionCounter);
+          sectionQuestions.push({
+            id: `q-${questionCounter}`,
+            text: questionText,
+            difficulty: 'Moderate',
+            marks: qt.marks
+          });
+          answerKey.push(`${questionCounter}. Sample answer based on course content.`);
+          questionCounter++;
+        }
+      }
+
+      sections.push({
+        title: `Section ${String.fromCharCode(65 + i)}`,
+        instruction: this.getInstruction(qt.type),
+        questions: sectionQuestions
+      });
+    }
+
+    const timeAllowed = additionalInfo?.toLowerCase().includes('hour')
+      ? parseInt(additionalInfo.match(/\d+/)?.[0] || '1') * 60
+      : 45;
+
+    return { sections, answerKey, timeAllowed };
+  }
+
+  private static async generateAnswerWithGroq(question: string, subject: string): Promise<string> {
+    try {
+      const prompt = `Given this question about ${subject}:
+"${question}"
+
+Provide a concise answer hint (1-2 sentences) that guides toward the correct answer but doesn't give it away completely.
+Return ONLY the answer hint, no quotes or formatting.`;
+
+      const response = await fetch(this.GROQ_API_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.GROQ_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'mixtral-8x7b-32768',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.5,
+          max_tokens: 150,
+        })
+      });
+
+      if (response.ok) {
+        const data = (await response.json()) as any;
+        return data.choices?.[0]?.message?.content || 'Refer to course materials for answer.';
+      }
+    } catch (error) {
+      console.error('Error generating answer hint:', error);
+    }
+
+    return 'Refer to course materials for answer.';
+  }
+
+  // Combined generation using available models (Groq + Gemini) to increase diversity
+  private static async generateQuestionsWithModels(jobData: JobData): Promise<{ sections: Section[]; answerKey: string[]; timeAllowed: number }> {
+    const { questionTypes } = jobData;
+    const sections: Section[] = [];
+    const answerKey: string[] = [];
+    let qCounter = 1;
+
+    for (let i = 0; i < questionTypes.length; i++) {
+      const qt = questionTypes[i];
+      const desired = qt.count;
+      const results: Question[] = [];
+
+      // Try Groq first
+      if (this.GROQ_API_KEY) {
+        try {
+          const groqRes = await this.generateQuestionsWithGroqSection(jobData, qt);
+          results.push(...groqRes);
+        } catch (err) {
+          console.error('Groq section error:', err);
+        }
+      }
+
+      // Then Gemini to diversify
+      if (this.GEMINI_API_KEY) {
+        try {
+          const gemRes = await this.generateWithGemini(jobData, qt);
+          results.push(...gemRes);
+        } catch (err) {
+          console.error('Gemini section error:', err);
+        }
+      }
+
+      // Sanitize and dedupe
+      const cleaned = this.dedupeQuestions(results.map((q) => ({
+        id: q.id,
+        text: this.sanitizeQuestionText(q.text),
+        difficulty: q.difficulty || 'Moderate',
+        marks: q.marks || qt.marks
+      })));
+
+      // If still not enough, fill with template-based
+      while (cleaned.length < desired) {
+        const text = this.generateQuestionText(qt.type, jobData.subject, 'Moderate', qCounter);
+        cleaned.push({ id: `q-${qCounter}`, text, difficulty: 'Moderate', marks: qt.marks });
+        qCounter++;
+      }
+
+      const final = cleaned.slice(0, desired).map((q, idx) => ({ ...q, id: `q-${i + 1}-${idx + 1}` }));
+
+      // Push to sections and build answer key
+      sections.push({ title: `Section ${String.fromCharCode(65 + i)}`, instruction: this.getInstruction(qt.type), questions: final });
+
+      for (const ques of final) {
+        // Try model answer hint generation using Groq if available, else generic hint
+        const hint = this.GROQ_API_KEY ? await this.generateAnswerWithGroq(ques.text, jobData.subject) : 'Refer to course materials for answer.';
+        answerKey.push(`${qCounter}. ${hint}`);
+        qCounter++;
+      }
+    }
+
+    const timeAllowed = jobData.additionalInfo?.toLowerCase().includes('hour')
+      ? parseInt(jobData.additionalInfo.match(/\d+/)?.[0] || '1') * 60
+      : 45;
+
+    return { sections, answerKey, timeAllowed };
+  }
+
+  // Helper: call Groq per-section but return Questions only (used by ensemble)
+  private static async generateQuestionsWithGroqSection(jobData: JobData, qt: any): Promise<Question[]> {
+    const temp = await this.generateQuestionsWithGroq({ ...jobData, questionTypes: [qt] } as JobData);
+    const sec = temp.sections?.[0];
+    return sec?.questions || [];
+  }
+
+  // Helper: call Gemini model (best-effort parsing similar to Groq)
+  private static async generateWithGemini(jobData: JobData, qt: any): Promise<Question[]> {
+    const { title, subject, className, additionalInfo } = jobData;
+    const prompt = `Generate ${qt.count} original ${qt.type} questions on the subject "${subject}" for class ${className}. Topic: ${title}. Additional context: ${additionalInfo}. Requirements: produce distinct questions, avoid phrasing like \"from the PDF\" or \"based on the uploaded content\". Return a JSON array like [{\"text\": \"...\", \"difficulty\": \"Easy|Moderate|Hard\"}, ...]`;
+
+    try {
+      const url = this.GEMINI_API_URL + (this.GEMINI_API_KEY ? `?key=${this.GEMINI_API_KEY}` : '');
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, max_output_tokens: 1024 })
+      });
+
+      if (!resp.ok) throw new Error(`Gemini API error: ${resp.statusText}`);
+      const data = (await resp.json()) as any;
+      const text = data.candidates?.[0]?.output || data.output?.[0]?.content || JSON.stringify(data);
+      const jsonMatch = (text as string).match(/\[[\s\S]*\]/);
+      const generated = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+
+      return generated.map((q: any, idx: number) => ({ id: `g-${idx + 1}`, text: q.text || `Question ${idx + 1}`, difficulty: q.difficulty || 'Moderate', marks: qt.marks }));
+    } catch (err) {
+      console.error('Gemini generation failed:', err);
+      return [];
+    }
+  }
+
+  // Remove boilerplate phrases and short duplicative questions
+  private static sanitizeQuestionText(text: string): string {
+    if (!text) return text;
+    let t = text.replace(/\s+/g, ' ').trim();
+    // Remove common unwanted phrases
+    t = t.replace(/from the (uploaded )?pdf/ig, '');
+    t = t.replace(/based on the (uploaded )?content/ig, '');
+    t = t.replace(/according to the (uploaded )?content/ig, '');
+    t = t.replace(/as mentioned in the (pdf|document|uploaded content)/ig, '');
+    t = t.replace(/in the uploaded content/ig, '');
+    t = t.replace(/based on the material/ig, '');
+    t = t.replace(/please answer the following question:?/ig, '');
+    t = t.replace(/\"/g, '');
+    return t.trim();
+  }
+
+  private static dedupeQuestions(questions: Question[]): Question[] {
+    const seen = new Set<string>();
+    const out: Question[] = [];
+    for (const q of questions) {
+      const key = q.text.toLowerCase().replace(/[^a-z0-9 ]/g, '').slice(0, 120);
+      if (!seen.has(key) && q.text.trim().length > 15) {
+        seen.add(key);
+        out.push(q);
+      }
+    }
+    return out;
+  }
+
+  private static generateQuestionsFromTemplates(jobData: JobData): { sections: Section[]; answerKey: string[]; timeAllowed: number } {
+    const { title, subject, className, questionTypes, additionalInfo } = jobData;
     const sections: Section[] = [];
     const answerKey: string[] = [];
 
-    const sectionNames = ['Section A', 'Section B', 'Section C'];
     const difficultyLevels: Array<'Easy' | 'Moderate' | 'Hard'> = ['Easy', 'Moderate', 'Hard'];
-
     let questionCounter = 1;
 
     for (let i = 0; i < questionTypes.length; i++) {
@@ -40,14 +311,14 @@ export class AIService {
       }
 
       sections.push({
-        title: sectionNames[i] || `Section ${String.fromCharCode(65 + i)}`,
+        title: `Section ${String.fromCharCode(65 + i)}`,
         instruction: this.getInstruction(qt.type),
         questions: sectionQuestions
       });
     }
 
-    const timeAllowed = additionalInfo?.toLowerCase().includes('hour') 
-      ? parseInt(additionalInfo.match(/\d+/)?.[0] || '1') * 60 
+    const timeAllowed = additionalInfo?.toLowerCase().includes('hour')
+      ? parseInt(additionalInfo.match(/\d+/)?.[0] || '1') * 60
       : 45;
 
     return { sections, answerKey, timeAllowed };

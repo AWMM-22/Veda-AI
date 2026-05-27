@@ -3,6 +3,7 @@ import mongoose, { Types } from 'mongoose';
 export interface IStudentResponse {
   _id?: string;
   mcqAssignmentId: Types.ObjectId;
+  examId?: string;
   rollNumber: string;
   studentName?: string;
   responses: Array<{
@@ -19,6 +20,7 @@ export interface IStudentResponse {
 const studentResponseSchema = new mongoose.Schema(
   {
     mcqAssignmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'MCQAssignment', required: true },
+    examId: { type: String, required: true, index: true },
     rollNumber: { type: String, required: true },
     studentName: String,
     responses: [
@@ -36,7 +38,9 @@ const studentResponseSchema = new mongoose.Schema(
 );
 
 studentResponseSchema.index({ mcqAssignmentId: 1 });
+studentResponseSchema.index({ examId: 1 });
 studentResponseSchema.index({ rollNumber: 1 });
 studentResponseSchema.index({ mcqAssignmentId: 1, rollNumber: 1 }, { unique: true });
+studentResponseSchema.index({ examId: 1, rollNumber: 1 }, { unique: true });
 
 export const StudentResponseModel = mongoose.model('StudentResponse', studentResponseSchema);

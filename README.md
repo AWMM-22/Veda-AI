@@ -1,178 +1,115 @@
-# VedaAI - AI Assessment Creator
+# VedaAI — AI Assessment Creator
 
-A full-stack AI-powered assessment creation platform for teachers. Create, generate, and manage question papers with ease.
+TL;DR
+- VedaAI converts uploaded documents into structured question papers (descriptive + MCQs), runs live quizzes, records student responses, and provides leaderboards.
 
-## Architecture Overview
+**Features**
+- **Document-to-questions:** Upload PDF/text and auto-generate sections and questions (descriptive + MCQs).
+- **AI Ensemble:** Uses Groq + Google Gemini models for question and distractor generation with sanitization and deduplication.
+- **MCQ generation:** AI-backed options with inferred `correctAnswer` when confident and shareable links (QR support).
+- **Background worker:** Asynchronous generation via Redis + BullMQ so the API stays responsive.
+- **Real-time UI:** Socket.IO updates for job progress and notifications.
+- **Quiz flow + ranking:** Students enter name/roll, take quizzes, and see rankings.
+- **Robust parsing:** PDF parsing with OCR fallback and sentence-based chunking to avoid mid-word splits.
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   Next.js App   │────▶│  Express API    │────▶│   MongoDB       │
-│   (Frontend)    │     │   (Backend)     │     │   (Database)    │
-│                 │◄────│                 │◄────│                 │
-│  Zustand Store  │     │  BullMQ Queue   │     │  Redis Cache    │
-│  Socket.IO      │◄────│  Socket.IO      │     │                 │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-                              │
-                              ▼
-                        ┌─────────────────┐
-                        │  AI Worker      │
-                        │  (Question Gen) │
-                        └─────────────────┘
-```
+**System Architecture (high-level)**
+- **Frontend (Next.js + Tailwind):** Dashboard, assignment creation, quiz UI and ranking pages.
+- **Backend (Express + TypeScript):** REST + WebSocket API exposing assignments, MCQs and quiz endpoints.
+- **Worker process:** Consumes BullMQ jobs (question generation, MCQ assembly, PDF export).
+- **Queue (BullMQ + Redis):** Reliable background job processing and retry.
+- **Database (MongoDB):** Persist assignments, MCQ sets, student responses and metadata.
+- **AI Service:** Orchestrates calls to Groq and Gemini, sanitizes outputs and dedupes results.
 
-## Project Structure
+**Tech Stack & Purpose**
+- **Next.js (React + TypeScript):** UI, routing and SSR/SSG where appropriate.
+- **Tailwind CSS:** Styling and design tokens (see `frontend/src/app/globals.css`).
+- **Express + TypeScript:** API layer, auth hooks, and WebSocket integration.
+- **Socket.IO:** Real-time progress and notifications.
+- **BullMQ + Redis:** Background job queue for CPU/IO-bound AI tasks.
+- **MongoDB:** Persistent storage for assignments and student responses.
+- **pdfjs-dist, tesseract, canvas:** Document parsing and OCR.
+- **Groq / Google Gemini:** Primary AI models for generation (replaceable/configurable).
 
-```
-veda-ai/
-├── backend/                 # Node.js + Express + TypeScript
-│   ├── src/
-│   │   ├── config/           # DB & Redis config
-│   │   ├── models/           # Mongoose models
-│   │   ├── routes/           # API routes
-│   │   ├── services/         # AI & PDF services
-│   │   ├── workers/          # BullMQ background workers
-│   │   ├── websocket/        # Socket.IO setup
-│   │   ├── types/            # TypeScript types
-│   │   └── index.ts          # Entry point
-│   ├── package.json
-│   └── tsconfig.json
-│
-└── frontend/                # Next.js + TypeScript
-    ├── src/
-    │   ├── app/              # Next.js App Router
-    │   ├── components/       # React components
-    │   ├── store/             # Zustand state management
-    │   ├── lib/               # API & Socket clients
-    │   └── types/             # TypeScript types
-    ├── package.json
-    └── tailwind.config.ts
-```
+**Repository Layout (important folders)**
+- `backend/` — Express server, routes, services, workers, models and AI orchestration.
+- `frontend/` — Next.js app, components, styles and pages.
+- `uploads/` — Temporary uploaded files used for parsing.
 
-## Tech Stack
+**Environment (common vars)**
+- `MONGODB_URI` — MongoDB connection string
+- `REDIS_URL` — Redis connection string (used by BullMQ)
+- `PORT` — Backend port (default `5000`)
+- `CLIENT_URL` / `FRONTEND_URL` — Frontend origin(s) for CORS and share links
+- `GROQ_API_KEY`, `GEMINI_API_KEY` — AI provider credentials
 
-### Frontend
-- **Next.js 14** - React framework with App Router
-- **TypeScript** - Type safety
-- **Tailwind CSS** - Utility-first styling
-- **Zustand** - Lightweight state management
-- **Socket.IO Client** - Real-time updates
-- **Lucide React** - Icons
-- **React Hot Toast** - Notifications
+**Local Setup (quick)**
+- Backend
 
-### Backend
-- **Node.js + Express** - API server
-- **TypeScript** - Type safety
-- **MongoDB + Mongoose** - Document database
-- **Redis + BullMQ** - Queue & caching
-- **Socket.IO** - Real-time communication
-- **Puppeteer** - PDF generation
-- **Zod** - Validation
-- **Multer** - File uploads
-
-### AI Integration
-- Simulated AI service (replace with Gemini/Groq API)
-- Structured prompt generation
-- Parsed response handling
-
-## Features
-
-### Core
-- ✅ Create assignments with file upload, due date, question types
-- ✅ AI-powered question generation with sections & difficulty levels
-- ✅ Real-time status updates via WebSocket
-- ✅ Structured question paper output
-- ✅ PDF export with proper formatting
-- ✅ Responsive design (Desktop + Mobile)
-
-### Bonus
-- ✅ Download as PDF (proper formatting)
-- ✅ Action bar (Regenerate)
-- ✅ Difficulty badges (Easy/Moderate/Hard)
-- ✅ Collapsible sidebar
-- ✅ Search & filter assignments
-- ✅ Queue-based background processing
-
-## Getting Started
-
-### Prerequisites
-- Node.js 18+
-- MongoDB
-- Redis
-
-### Backend Setup
-
-```bash
+```powershell
 cd backend
 npm install
-
-# Create .env file
-cp .env.example .env
-# Edit .env with your credentials
-
-# Start server
-npm run dev
-
-# In another terminal, start worker
-npm run worker
+cp .env.example .env   # set MONGODB_URI, REDIS_URL, CLIENT_URL, API keys
+npm run build
+npm start
 ```
 
-### Frontend Setup
+- Worker (optional, runs via start script concurrently)
 
-```bash
+```powershell
+cd backend
+# run worker directly if needed
+node dist/workers/questionGenerator.js
+```
+
+- Frontend
+
+```powershell
 cd frontend
 npm install
+npm run dev     # starts on 3000 (or next free port)
 
-# Start development server
-npm run dev
+npm start        # serve production build
 ```
 
-### Environment Variables
+**Common commands**
+- Run backend dev: `npm run dev` (from `backend/`)
+- Build backend: `npm run build` (from `backend/`)
+- Start backend + worker: `npm start` (from `backend/`)
+- Run frontend dev: `npm run dev` (from `frontend/`)
 
-#### Backend (.env)
-```
-PORT=5000
-MONGODB_URI=mongodb://localhost:27017/vedaai
-REDIS_URL=redis://default:your_redis_password@localhost:6379/0
-GEMINI_API_KEY=your_gemini_api_key
-GROQ_API_KEY=your_groq_api_key
-NODE_ENV=development
-```
+**Troubleshooting**
+- If the dev frontend shows a blank page because of stale dev artifacts, remove the `.next` cache and rebuild:
 
-#### Frontend (.env.local)
-```
-NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
+```powershell
+cd frontend
+Remove-Item -Recurse -Force .next
+npm run build
 ```
 
-## API Endpoints
+- If `Port 3000` is in use, Next will pick another port (e.g. `3001`) — either free 3000 or use the provided port.
+- If you see `Cannot find module './xxx.js'` or `Unexpected end of JSON input` in dev, clean `.next` and restart the dev server.
+- For CORS issues ensure `CLIENT_URL` includes your frontend origin and the backend sets `app.options('*', cors())`.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/assignments` | Create assignment |
-| GET | `/api/assignments` | List assignments |
-| GET | `/api/assignments/:id` | Get assignment |
-| DELETE | `/api/assignments/:id` | Delete assignment |
-| POST | `/api/assignments/:id/regenerate` | Regenerate questions |
-| GET | `/api/assignments/:id/pdf` | Download PDF |
+**AI & Quality notes**
+- The AI pipeline uses an ensemble (Groq + Gemini) with prompt sanitization and deduplication to avoid verbatim source text and improve distractor diversity.
+- MCQ generation tries to provide `correctAnswer` when confident; otherwise a safe template fallback is used.
 
-## WebSocket Events
+**Deployment notes**
+- Frontend: recommended deploy to Vercel (set `NEXT_PUBLIC_API_URL` to backend). Use the production Vercel URL in `CLIENT_URL` for share/QR links.
+- Backend + Worker: deploy together (Render, Heroku, or similar). Ensure Redis and MongoDB are configured and both server + worker processes are started (concurrently or process manager).
 
-| Event | Direction | Description |
-|-------|-----------|-------------|
-| `join-assignment` | Client → Server | Join room for updates |
-| `status-update` | Server → Client | Assignment status change |
+**Where to look**
+- Frontend entry: frontend/src/app/layout.tsx and components under frontend/src/components/
+- Backend entry: backend/src/index.ts
+- Worker: backend/src/workers/questionGenerator.ts
+- AI orchestration: backend/src/services/aiService.ts and backend/src/services/questionAgent.ts
+- MCQ service & routes: backend/src/services/mcqService.ts, backend/src/routes/mcq.ts
 
-## Approach
+If you want, I can:
+- Add a small architecture diagram (mermaid) to this README.
+- Expand troubleshooting with exact error traces we saw (dev runtime module errors).
+- Create an `.env.example` template.
 
-1. **Queue-Based Architecture**: BullMQ handles AI generation asynchronously, preventing API timeouts and enabling retries.
-
-2. **Real-Time Updates**: Socket.IO rooms notify clients when generation completes, eliminating polling.
-
-3. **State Management**: Zustand provides simple, performant state sharing across components.
-
-4. **PDF Generation**: Puppeteer renders styled HTML to PDF, ensuring consistent formatting across browsers.
-
-5. **Responsive Design**: Mobile-first approach with collapsible sidebar and adaptive layouts.
-
-## License
-
-MIT
+---
+Updated README.md
+# In another terminal, start worker

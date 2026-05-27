@@ -100,11 +100,13 @@ export interface MCQ {
 export interface MCQAssignment {
   _id?: string;
   assignmentId: string;
+  examId?: string;
   mcqs: MCQ[];
   title: string;
   description?: string;
   sharingToken: string;
   qrCode?: string;
+  qrUrl?: string;
   totalMarks: number;
   timeLimit?: number;
   status: 'draft' | 'active' | 'closed';
@@ -120,6 +122,7 @@ export interface StudentResponseData {
 export interface StudentResponse {
   _id?: string;
   mcqAssignmentId: string;
+  examId: string;
   rollNumber: string;
   studentName?: string;
   responses: StudentResponseData[];

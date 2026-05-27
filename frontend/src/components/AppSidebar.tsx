@@ -34,8 +34,8 @@ const VedaLogo = ({ compact = false }: { compact?: boolean }) => (
   <Image
     src="/purple_veda_logo_black.png"
     alt="Veda logo"
-    width={compact ? 72 : 96}
-    height={compact ? 19 : 26}
+    width={compact ? 56 : 78}
+    height={compact ? 15 : 21}
     priority
     className="block h-auto w-auto select-none"
   />
@@ -75,24 +75,24 @@ export default function AppSidebar() {
 
       <aside
         className={`fixed left-0 top-0 z-50 flex h-screen flex-col border-r border-slate-200 bg-white shadow-sm transition-all duration-300 ${
-          sidebarOpen ? 'w-72' : 'w-24'
+          sidebarOpen ? 'w-64' : 'w-20'
         } ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
       >
-        <div className="flex items-center justify-center border-b border-slate-200 p-4">
+        <div className="flex items-center justify-center border-b border-slate-200 px-3 py-3">
           <VedaLogo />
         </div>
 
-        <div className="p-4 pt-3 pb-2">
+        <div className="px-3 pt-3 pb-2">
           <Link
             href="/assignments/create"
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-md ring-1 ring-orange-500/70 transition-colors hover:bg-slate-800"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2.5 text-sm font-medium text-white shadow-md ring-1 ring-orange-500/70 transition-colors hover:bg-slate-800"
           >
             <Plus size={18} />
             {sidebarOpen && <span>Create Assignment</span>}
           </Link>
         </div>
 
-        <nav className="scrollbar-hidden flex-1 overflow-y-auto px-3 py-1 space-y-1">
+        <nav className="scrollbar-hidden flex-1 overflow-y-auto space-y-1 px-2 py-1">
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
 
@@ -110,13 +110,13 @@ export default function AppSidebar() {
           })}
         </nav>
 
-        <div className="space-y-2 border-t border-slate-200 p-3 pb-4">
+        <div className="space-y-2 border-t border-slate-200 px-2 py-3 pb-4">
           <Link href="/settings" className={`sidebar-item ${!sidebarOpen ? 'justify-center' : ''}`}>
             <Settings size={20} />
             {sidebarOpen && <span>Settings</span>}
           </Link>
 
-          <div className={`mt-1 flex items-center gap-3 rounded-xl bg-slate-50 px-4 py-3 ${!sidebarOpen ? 'justify-center' : ''}`}>
+          <div className={`mt-1 flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5 ${!sidebarOpen ? 'justify-center' : ''}`}>
             <div className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white" style={avatarStyle}>
               JD
             </div>

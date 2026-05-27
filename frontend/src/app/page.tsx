@@ -87,7 +87,7 @@ export default function Home() {
     <div className="min-h-screen pb-24 lg:pb-10">
       <AppSidebar />
 
-      <main className={`min-h-screen pt-20 transition-all duration-300 ${sidebarOpen ? 'lg:ml-[19rem]' : 'lg:ml-[6.5rem]'} lg:pt-4`}>
+      <main className={`min-h-screen pt-20 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-20'} lg:pt-4`}>
         <div className="page-container max-w-[1400px] py-3 lg:py-4">
           <div className="panel-soft mb-4 px-4 py-4 sm:px-5 sm:py-4 lg:mb-5">
             <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">

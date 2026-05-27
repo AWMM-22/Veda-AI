@@ -4,11 +4,13 @@ import { IMCQ } from './MCQ';
 export interface IMCQAssignment {
   _id?: string;
   assignmentId: Types.ObjectId;
+  examId?: string;
   mcqs: IMCQ[];
   title: string;
   description?: string;
   sharingToken: string; // unique token for QR code/link
   qrCode?: string; // base64 encoded QR code image
+  qrUrl?: string;
   totalMarks: number;
   timeLimit?: number; // in minutes
   status: 'draft' | 'active' | 'closed';
@@ -36,8 +38,10 @@ const mcqAssignmentSchema = new mongoose.Schema(
     ],
     title: { type: String, required: true },
     description: String,
+    examId: { type: String, unique: true, sparse: true, index: true },
     sharingToken: { type: String, unique: true, required: true, index: true },
     qrCode: String, // base64 encoded PNG
+    qrUrl: String,
     totalMarks: Number,
     timeLimit: Number,
     status: { type: String, enum: ['draft', 'active', 'closed'], default: 'draft' },
