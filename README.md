@@ -1,6 +1,17 @@
 # VedaAI - AI Assessment Creator
 
-A full-stack AI-powered assessment creation platform for teachers. Create, generate, and manage question papers with ease.
+VedaAI is a robust, scalable Node.js + Express + TypeScript application powering the VedaAI Assessment Creator platform.
+It provides an end-to-end workflow for generating, storing, and distributing AI-generated assignments for educational purposes.
+Key features include a queue-based asynchronous processing pipeline, modular service layer, integration with state-of-the-art LLMs for question generation, PDF export, and real-time status updates via WebSocket.
+
+System Overview
+
+The backend accepts assignment creation requests through a RESTful API. To ensure high reliability and scalability, every incoming assignment is processed asynchronously via a job queue powered by BullMQ and Redis.
+Each assignment document, along with its settings, is stored in MongoDB using a type-safe schema.
+Assignment generation leverages an AI service (via LLM APIs such as Gemini or Groq). To maximize the accuracy of generated content and minimize hallucination, the system implements chunking—large pieces of input data are divided into manageable chunks before being sent to the LLM, ensuring deterministic outputs and context integrity.
+Generated assignments are rendered and exported as PDFs via a dedicated service using Puppeteer.
+Real-time status updates are delivered to connected clients over WebSocket, enabling transparent multi-user collaboration and monitoring.
+The design is extensible, supporting future integrations with new AI providers and external school systems.
 
 ## Architecture Overview
 
@@ -19,7 +30,22 @@ A full-stack AI-powered assessment creation platform for teachers. Create, gener
                         │  (Question Gen) │
                         └─────────────────┘
 ```
+##System architecture
+### Queue-Based Assignment Processing Flow
 
+```mermaid
+flowchart TD
+    A[Client] -- "POST /api/assignments" --> B[API Server]
+    B -- "Save Assignment<br/>(status: pending)" --> C[MongoDB]
+    B -- "Add Job" --> D[Redis/BullMQ Queue]
+    D -- "Job Pickup" --> E[Worker Process]
+    E -- "Chunk Assignment Data<br/>Send to LLM (aiService)" --> F[LLM Service]
+    F -- "LLM Response<br/>(Questions, Answers)" --> E
+    E -- "Save Results<br/>(status: completed)" --> C
+    E -- "Generate PDF<br/>(pdfService)" --> G[PDF Export]
+    E -- "Emit Updates" --> H[WebSocket Server]
+    H -- "Push Status" --> A
+```
 ## Project Structure
 
 ```
