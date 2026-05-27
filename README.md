@@ -12,7 +12,7 @@ Assignment generation leverages an AI service (via LLM APIs such as Gemini or Gr
 Generated assignments are rendered and exported as PDFs via a dedicated service using Puppeteer.
 Real-time status updates are delivered to connected clients over WebSocket, enabling transparent multi-user collaboration and monitoring.
 The design is extensible, supporting future integrations with new AI providers and external school systems.
-
+```mermaid
 flowchart TD
     A[Client (Frontend)] -- "POST /api/assignments" --> B[RESTful API (Express)]
     B -- "Validation & Save (status: pending)" --> C[MongoDB]
@@ -30,6 +30,7 @@ flowchart TD
     %% Additional extensibility
     E -- "Future: Integrate More AI Providers"--> J[Other AI API]
     B -- "Future: Integrate School Systems" --> K[School System API]
+```
 
 ## Architecture Overview
 
