@@ -30,6 +30,7 @@ export default function ExamPage() {
   const params = useParams();
   const router = useRouter();
   const examId = params.examId as string;
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://veda-ai-jzpz.onrender.com/api';
 
   const [loading, setLoading] = useState(true);
   const [exam, setExam] = useState<Exam | null>(null);
@@ -45,7 +46,7 @@ export default function ExamPage() {
   useEffect(() => {
     const fetchExam = async () => {
       try {
-        const res = await fetch(`/api/exam/${examId}`);
+        const res = await fetch(`${apiBase}/exam/${examId}`);
         const data = await res.json();
 
         if (!data.success) {
@@ -112,7 +113,7 @@ export default function ExamPage() {
         selectedAnswer,
       }));
 
-      const res = await fetch(`/api/exam/${examId}/submit`, {
+      const res = await fetch(`${apiBase}/exam/${examId}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

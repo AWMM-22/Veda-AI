@@ -6,7 +6,7 @@ import { MCQService } from '../services/mcqService';
 dotenv.config();
 
 async function run() {
-  const FRONTEND_URL = process.env.FRONTEND_URL || process.env.CLIENT_URL?.split(',')[0] || 'http://localhost:3002';
+  const FRONTEND_URL = process.env.FRONTEND_URL || process.env.CLIENT_URL?.split(',')[0] || 'https://veda-ai-pied.vercel.app';
 
   console.log('Connecting to DB...');
   await connectDB();

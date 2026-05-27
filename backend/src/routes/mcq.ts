@@ -22,7 +22,7 @@ const storage: StorageEngine = multer.diskStorage({
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 const router = express.Router();
-const BASE_URL = process.env.FRONTEND_URL || process.env.CLIENT_URL?.split(',')[0] || 'http://localhost:3002';
+const BASE_URL = process.env.FRONTEND_URL || process.env.CLIENT_URL?.split(',')[0] || 'https://veda-ai-pied.vercel.app';
 
 const buildExamPayload = (mcqAssignment: any) => ({
   _id: mcqAssignment._id,
