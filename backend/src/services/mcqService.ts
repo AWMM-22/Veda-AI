@@ -88,23 +88,18 @@ export class MCQService {
       }
     }
 
-    return {
-      questionText,
-      options: this.generateOptions(questionText),
-      correctAnswer: 'A',
-      difficulty: 'medium',
-    };
+    return this.generateFallbackMCQ(questionText);
   }
 
   private static async generateMCQWithGroq(questionText: string, marks: number): Promise<any> {
-    const prompt = `Convert the following source question into a strong multiple-choice question.
+    const prompt = `Create one strong multiple-choice question from the following source passage or topic.
 
-Source question:
+Source text:
 ${questionText}
 
 Return ONLY valid JSON in this exact shape:
 {
-  "questionText": "rephrased question",
+  "questionText": "clear, concise question ending with ?",
   "options": [
     {"label": "A", "text": "..."},
     {"label": "B", "text": "..."},
@@ -118,7 +113,8 @@ Return ONLY valid JSON in this exact shape:
 Rules:
 - Make all 4 options distinct.
 - Only one option should be correct.
-- Do not repeat phrases like "from the PDF" or "based on the uploaded content".
+- The question should test understanding of the passage, not quote it.
+- Avoid filler phrases like "what is mentioned about" or copying long passages.
 - Keep the question clear and exam-like.`;
 
     const response = await fetch(this.GROQ_API_URL, {
@@ -146,9 +142,9 @@ Rules:
   }
 
   private static async generateMCQWithGemini(questionText: string, marks: number): Promise<any> {
-    const prompt = `Convert the following source question into a strong multiple-choice question.
+    const prompt = `Create one strong multiple-choice question from the following source passage or topic.
 
-Source question:
+Source text:
 ${questionText}
 
 Return ONLY valid JSON with fields questionText, options, correctAnswer, difficulty. Ensure the options are distinct and only one is correct.`;
@@ -192,9 +188,13 @@ Return ONLY valid JSON with fields questionText, options, correctAnswer, difficu
     }
 
     const deduped = [...unique.values()].slice(0, 4);
-    while (deduped.length < 4) {
-      const label = String.fromCharCode(65 + deduped.length);
-      deduped.push({ label, text: `A related but different option ${label}.` });
+    if (deduped.length < 4) {
+      return this.generateFallbackMCQ(fallbackQuestionText);
+    }
+
+    const texts = deduped.map((option) => option.text.toLowerCase());
+    if (new Set(texts).size < 4) {
+      return this.generateFallbackMCQ(fallbackQuestionText);
     }
 
     const labels = ['A', 'B', 'C', 'D'];
@@ -211,8 +211,13 @@ Return ONLY valid JSON with fields questionText, options, correctAnswer, difficu
       ? String(payload.difficulty).toLowerCase() as 'easy' | 'medium' | 'hard'
       : 'medium';
 
+    const questionText = String(payload?.questionText || fallbackQuestionText).trim();
+    if (!questionText || questionText.length < 12 || questionText.includes('What is mentioned about:')) {
+      return this.generateFallbackMCQ(fallbackQuestionText);
+    }
+
     return {
-      questionText: String(payload?.questionText || fallbackQuestionText).trim(),
+      questionText: questionText.endsWith('?') ? questionText : `${questionText}?`,
       options: finalOptions,
       correctAnswer,
       difficulty,
@@ -276,6 +281,50 @@ Return ONLY valid JSON with fields questionText, options, correctAnswer, difficu
       { label: 'C', text: uniqueOptions[2] },
       { label: 'D', text: uniqueOptions[3] },
     ];
+  }
+
+  private static generateFallbackMCQ(sourceText: string): { questionText: string; options: MCQOption[]; correctAnswer: string; difficulty: 'easy' | 'medium' | 'hard' } {
+    const cleaned = sourceText.replace(/\s+/g, ' ').trim();
+    const tokens = cleaned.toLowerCase().match(/[a-z][a-z0-9-]{2,}/g) ?? [];
+    const stopWords = new Set([
+      'what', 'which', 'when', 'where', 'why', 'how', 'does', 'do', 'is', 'are', 'was', 'were',
+      'the', 'and', 'for', 'with', 'that', 'this', 'from', 'into', 'about', 'according', 'based',
+      'uploaded', 'content', 'pdf', 'question', 'option', 'options', 'passage', 'idea', 'main', 'best',
+      'describe', 'explain', 'write', 'short', 'note', 'significance', 'context', 'following', 'statement',
+      'mentioned', 'mentioned', 'about', 'system', 'state', 'process', 'thread'
+    ]);
+
+    const focusTerms = Array.from(new Set(tokens.filter((word) => !stopWords.has(word)))).slice(0, 6);
+    const primary = focusTerms.slice(0, 2).join(' ') || 'the topic';
+    const secondary = focusTerms.slice(2, 4).join(' ') || 'a related concept';
+    const tertiary = focusTerms.slice(4, 6).join(' ') || 'a supporting detail';
+    const keyword = primary.charAt(0).toUpperCase() + primary.slice(1);
+    const related = secondary.charAt(0).toUpperCase() + secondary.slice(1);
+    const support = tertiary.charAt(0).toUpperCase() + tertiary.slice(1);
+
+    const questionText = `Which statement best describes the main topic of the passage?`;
+    const options = Array.from(new Set([
+      `The passage mainly discusses ${keyword}.`,
+      `The passage mainly discusses ${related}.`,
+      `The passage mainly discusses ${support}.`,
+      `The passage mainly discusses an unrelated topic.`,
+    ]));
+
+    while (options.length < 4) {
+      options.push(`A different but related idea from the passage.`);
+    }
+
+    return {
+      questionText,
+      options: [
+        { label: 'A', text: options[0] },
+        { label: 'B', text: options[1] },
+        { label: 'C', text: options[2] },
+        { label: 'D', text: options[3] },
+      ],
+      correctAnswer: 'A',
+      difficulty: 'medium',
+    };
   }
 
   /**

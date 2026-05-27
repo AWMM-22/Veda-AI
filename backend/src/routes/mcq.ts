@@ -236,11 +236,7 @@ router.post('/mcq/create-from-pdf', upload.single('file'), async (req: Request, 
     const chunks = parsedDoc.chunks.slice(0, 20); // Limit to 20 chunks for MCQ generation
     
     for (const [idx, chunk] of chunks.entries()) {
-      const words = chunk.split(' ');
-      const questionStart = words.slice(0, Math.min(18, words.length)).join(' ');
-      const sourceQuestion = `What is the key idea described in this passage: "${questionStart}..."?`;
-
-      mcqs.push(await MCQService.generateMCQFromText(sourceQuestion, 1, idx));
+      mcqs.push(await MCQService.generateMCQFromText(chunk, 1, idx));
     }
 
     // Create exam link and QR code
@@ -430,7 +426,8 @@ router.get('/mcq/:assignmentId', async (req: Request, res: Response) => {
     }
 
     const examId = mcqAssignment.examId || mcqAssignment.sharingToken;
-    const quizLink = mcqAssignment.qrUrl || `${BASE_URL}/exam/${examId}`;
+    const quizLink = `${BASE_URL}/exam/${examId}`;
+    const qrCode = await MCQService.createSharingLink(BASE_URL, examId, 'exam').then((result) => result.qrCode);
 
     res.json({
       success: true,
@@ -442,7 +439,7 @@ router.get('/mcq/:assignmentId', async (req: Request, res: Response) => {
         totalMarks: mcqAssignment.totalMarks,
         examId,
         sharingToken: mcqAssignment.sharingToken,
-        qrCode: mcqAssignment.qrCode,
+        qrCode,
         qrUrl: quizLink,
         quizLink,
         status: mcqAssignment.status,
