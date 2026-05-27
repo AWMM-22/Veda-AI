@@ -43,11 +43,31 @@ export default function ExamPage() {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [started, setStarted] = useState(false);
 
+  const fetchJsonWithFallback = async (primaryUrl: string, fallbackUrl: string, init?: RequestInit) => {
+    const tryFetch = async (url: string) => {
+      const response = await fetch(url, init);
+      const raw = await response.text();
+      try {
+        return { response, data: JSON.parse(raw) };
+      } catch {
+        return { response, data: { success: false, error: raw || `Request failed with ${response.status}` } };
+      }
+    };
+
+    const first = await tryFetch(primaryUrl);
+    if (first.response.ok) return first;
+
+    const second = await tryFetch(fallbackUrl);
+    return second;
+  };
+
   useEffect(() => {
     const fetchExam = async () => {
       try {
-        const res = await fetch(`${apiBase}/exam/${examId}`);
-        const data = await res.json();
+        const { data } = await fetchJsonWithFallback(
+          `${apiBase}/exam/${examId}`,
+          `${apiBase}/quiz/${examId}`
+        );
 
         if (!data.success) {
           setError(data.error || 'Failed to load exam');
@@ -113,17 +133,22 @@ export default function ExamPage() {
         selectedAnswer,
       }));
 
-      const res = await fetch(`${apiBase}/exam/${examId}/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rollNumber,
-          studentName: studentName || `Student-${rollNumber}`,
-          responses: formattedResponses,
-        }),
-      });
+      const payload = {
+        rollNumber,
+        studentName: studentName || `Student-${rollNumber}`,
+        responses: formattedResponses,
+      };
 
-      const data = await res.json();
+      const { data } = await fetchJsonWithFallback(
+        `${apiBase}/exam/${examId}/submit`,
+        `${apiBase}/quiz/${examId}/submit`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
+
       if (!data.success) {
         setError(data.error || 'Failed to submit exam');
         return;
